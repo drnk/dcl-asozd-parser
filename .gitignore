@@ -4,6 +4,10 @@
 
 # python
 **/*.pyc
+__pycache__
 
 # test documents
 **/*.docx
+
+# logs
+**/*.log

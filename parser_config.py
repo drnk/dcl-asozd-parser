@@ -2,7 +2,7 @@ config = {
     'types': {
         'fio': {
             'order_id': 1,
-            'check_re': r'[А-Я][а-я]+\\s+[А-Я][а-я]+\\s+[А-Я][а-я]+',
+            'check_re': r'[А-Я][а-я]+\s+[А-Я][а-я]+\s+[А-Я][а-я]+',
             'not_re': r'^Депутат Государственной Думы',
             'also_contains': ['photo'],
             'next_items': ['position'],

@@ -6,7 +6,14 @@ import abc
 import re
 import json
 import operator
+import shutil
+import os
 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IN_DIR = BASE_DIR + '\in'
+OUT_DIR = BASE_DIR + '\out'
+IMAGES_OUT_DIR = OUT_DIR + '\images'
 
 # Useful queries:
 # open('parser_config.json', 'w').write(json.dumps(P, indent=4))
@@ -18,8 +25,9 @@ def dbg(msg):
     if DEBUG: 
         pprint(msg)
 
-CONTENTS_FILE_NAME = 'word/document.xml'
-RELS_FILE_NAME = 'word/_rels/document.xml.rels'
+#CONTENTS_FILE_NAME = 'word/document.xml'
+#RELS_FILE_NAME = 'word/_rels/document.xml.rels'
+#IMG_DIR_NAME = 'word/media/'
 
 CLEANING_REGEXP = re.compile('<[^>]+>')
 
@@ -174,6 +182,9 @@ class DOCXParagraph(DOCXItem):
                     res.append([txt])
         return res
 
+    def __repr__(self):
+        return self._item.__repr__()
+
 
 
 class DOCXDocument(object):
@@ -181,17 +192,21 @@ class DOCXDocument(object):
 
     CONTENTS_FILE_NAME = 'word/document.xml'
     RELS_FILE_NAME = 'word/_rels/document.xml.rels'
+    IMG_DIR_NAME = 'word/media'
 
     RD = {}
 
     _DEBUG = True
+    _is_already_opened = False
 
     def __init__(self, file_name, *args, **kwargs):
         self.file_name = file_name
 
         if kwargs.get('debug'):
             self._DEBUG = kwargs['debug']
-        
+
+        self._openDocx()
+
 
     def __enter__(self):
         self._openDocx()
@@ -203,17 +218,27 @@ class DOCXDocument(object):
         self._doc.close()
         self._zipfile.close()
 
+    def getZipFile(self):
+        return self._zipfile
+
+    def openDocxImage(self, image_name):
+        return self.getZipFile().open('%s/%s' % (self.IMG_DIR_NAME, image_name), 'r')
+
     def load(self):
         self.loadRelationshipsData()
         self.loadDocumentData()
 
     def _openDocx(self):
         """Open docx document and set pointer objects for Relationships and Document content"""
-        self._zipfile = ZipFile(self.file_name, 'r')
-        #dbg("Contents of the %s" % self.file_name)
-        #dbg(self._zipfile.printdir())
-        self._rels = self._zipfile.open(RELS_FILE_NAME, 'r')
-        self._doc = self._zipfile.open(CONTENTS_FILE_NAME, 'r')
+        if not self._is_already_opened:
+            
+            self._zipfile = ZipFile(self.file_name, 'r')
+            #dbg("Contents of the %s" % self.file_name)
+            #dbg(self._zipfile.printdir())
+            self._rels = self._zipfile.open(self.RELS_FILE_NAME, 'r')
+            self._doc = self._zipfile.open(self.CONTENTS_FILE_NAME, 'r')
+            
+            self._is_already_opened = True
 
 
     def getDocumentRawData(self):
@@ -286,6 +311,11 @@ class ASOZDParser(DOCXDocument):
 
         self._init_config()
 
+        self._doc = DOCXDocument(self.file_name)
+
+    def getDoc(self):
+        return self._doc
+
 
     def _init_config(self):
         D = {}
@@ -322,10 +352,32 @@ class ASOZDParser(DOCXDocument):
             self._results[type]['raw_text'].append([text])
 
     def addResultImage(self, type, image_name):
-        if self._results[type]['images']:
+        dbg("Adding image %s for recognized %s" % (image_name, type))
+        if self._results[type].get('images'):
             self._results[type]['images'].append(image_name)
         else:
             self._results[type]['images'] = [image_name]
+    
+    def getFIO(self):
+        return self._results['fio']['text']
+
+    def saveImages(self):
+        for img_name in self._results['photo']['images']:
+            dbg('Trying to save image: %s' % img_name)
+            m = re.search(r'\.(.+)$', img_name)
+            if m:
+                img_ext = m.groups(1)[0]
+                dbg('Image name extenstion: %s' % img_ext)
+                if img_ext:
+                    dest_fname = '%s\%s.%s' % (IMAGES_OUT_DIR, self.getFIO(), img_ext) 
+                    dbg('Destination file name: %s' % dest_fname)
+                    with open(dest_fname, 'wb') as fimg:
+                        try:
+                            doc = self.getDoc()
+                            docx_img = doc.openDocxImage(img_name)
+                            shutil.copyfileobj(docx_img, fimg)
+                        finally:
+                            docx_img.close()
 
     def getResults(self):
         return self._results
@@ -362,6 +414,7 @@ class ASOZDParser(DOCXDocument):
 
         for r in self._re_list.items():
             tmp_re = re.compile(r[0])
+            dbg('Trying to recognize paragraph as %s with regex %s' % (r[1], r[0]))
             if tmp_re.match(p.getCleanedText().strip()):
 
                 not_re = self.config['types'][r[1]].get('not_re')
@@ -380,54 +433,57 @@ class ASOZDParser(DOCXDocument):
     def loadParagraphs(self):
         
         # open file
-        with DOCXDocument(self.file_name) as Doc:
+        Doc = self._doc
 
-            # load data from file
-            Doc.load()
+        # load data from file
+        Doc.load()
+        
+        # iterate over document paragraphs
+        pi = 1
+        last_recognized_type = None
+        #last_recognized_pi = None
+
+        for praw in Doc.getDocParagraphsIter():
+
+            # dbg - start
+            #dbg([c.name for c in praw.findChildren(recursive=False)])
+            # dbg - stop
+
+            p = DOCXParagraph(praw, docx=Doc)
+            self.addParagraph(p)
+            dbg('----> (%02d) Paragraph '%pi+p.getId())
+            dbg('Text: %s' % repr(p))
+            p_type = self.recognizeParagraph(p)
+
+            if p_type:
+                # start of docx part which could be related to 
+                # one of the target data parts
+                dbg('Paragraph recognized as [%s]' % p_type)
+
+                last_recognized_type = p_type
+                #last_recognized_pi = pi
+
+                self.addResult(p_type, p.getText(), p.getRawText())
+
+                extra_types_list = self.config['types'][p_type].get('also_contains')
+                if extra_types_list:
+                    dbg('Found %d extra types: %s' % (len(extra_types_list), extra_types_list))
+                    for extra_type in extra_types_list:
+                        if self.config['types'][extra_type].get('is_image'):
+                            dbg('Try to find images within paragraph')
+                            for img in p.getImages():
+                                drw = DOCXItem.factory(img, docx=Doc)
+                                img_name = drw.getImageName()
+                                dbg('Image %s found' % img_name)
+                                self.addResultImage(extra_type, img_name)
+
+
+            elif last_recognized_type:
+                self.addResult(last_recognized_type, p.getText(), p.getRawText())
+            else:
+                print('Warning! Paragraph iter %d was skipped.' % pi)
             
-            # iterate over document paragraphs
-            pi = 1
-            last_recognized_type = None
-            #last_recognized_pi = None
-
-            for praw in Doc.getDocParagraphsIter():
-
-                # dbg - start
-                dbg([c.name for c in praw.findChildren(recursive=False)])
-                # dbg - stop
-
-                p = DOCXParagraph(praw, docx=Doc)
-                self.addParagraph(p)
-                dbg('----> (%02d) Paragraph '%pi+p.getId())
-
-                p_type = self.recognizeParagraph(p)
-
-                if p_type:
-                    # start of docx part which could be related to 
-                    # one of the target data parts
-                    dbg('Paragraph recognized as [%s]' % p_type)
-
-                    last_recognized_type = p_type
-                    #last_recognized_pi = pi
-
-                    self.addResult(p_type, p.getText(), p.getRawText())
-
-                    extra_types_list = self.config['types'][p_type].get('also_contains')
-                    if extra_types_list:
-                        for extra_type in extra_types_list:
-                            if self.config['types'][extra_type].get('is_image'):
-                                for img in p.getImages():
-                                    drw = DOCXItem.factory(img, docx=Doc)
-                                    img_name = drw.getImageName()
-                                    self.addResultImage(extra_type, img_name)
-
-
-                elif last_recognized_type:
-                    self.addResult(last_recognized_type, p.getText(), p.getRawText())
-                else:
-                    print('Warning! Paragraph iter %d was skipped.')
-                
-                pi = pi + 1
+            pi = pi + 1
 
 
 if __name__ == '__main__':
@@ -446,3 +502,5 @@ if __name__ == '__main__':
     #print(P.getParagraphsText())
 
     pprint(P.getResults())
+
+    P.saveImages()
