@@ -7,6 +7,7 @@ config = {
             'also_contains': ['photo'],
             'next_items': ['position'],
             'name': 'fio',
+            'do_not_replace_check_re': True, 
         },
         'photo': {
             'order_id': 2,
@@ -19,6 +20,7 @@ config = {
             'also_contains': [],
             'next_items': ['fraction'],
             'name': 'position',
+            'do_not_replace_check_re': True,
         },
         'fraction': {
             'order_id': 4,
@@ -26,10 +28,11 @@ config = {
             'also_contains': [],
             'next_items': ['bio'],
             'name': 'fraction',
+            'do_not_replace_check_re': True,
         },
         'bio': {
             'order_id': 5,
-            'check_re': r'^Биография',
+            'check_re': r'^Биография:?\s*',
             'also_contains': [],
             'next_items': ['relations'],
             'name': 'bio',
@@ -37,13 +40,13 @@ config = {
         'relations': {
             'order_id': 6,
             'name': 'relations',
-            'check_re': r'^Аффиляция, связи:',
-            'also_contains': ['family']
+            'check_re': r'^Аффиляция, связи:?\s*',
+            'also_contains': ['family'],
         },
         'submitted': {
             'order_id': 7,
             'name': 'submitted',
-            'check_re': r'^Внесенные законопроекты:',
+            'check_re': r'^Внесенные законопроекты:?\s*',
         },
         'family': {
             'order_id': 8,
@@ -52,12 +55,12 @@ config = {
         'conclusion': {
             'order_id': 9,
             'name': 'conclusion',
-            'check_re': r'Выводы:',
+            'check_re': r'Выводы:?\s*',
         },
         'lobby': {
             'order_id': 10,
             'name': 'lobby',
-            'check_re': r'Группа лоббистов:',
+            'check_re': r'Группа лоббистов:?\s*',
             'list_of_strings': True
         }
     }

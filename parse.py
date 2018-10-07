@@ -8,17 +8,18 @@ import json
 import operator
 import shutil
 import os
+import io
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-IN_DIR = BASE_DIR + '\in'
-OUT_DIR = BASE_DIR + '\out'
+IN_DIR = '\in'
+OUT_DIR = '\out'
 IMAGES_OUT_DIR = OUT_DIR + '\images'
 
 
-CONTENTS_FILE_NAME = 'word/document.xml'
-RELS_FILE_NAME = 'word/_rels/document.xml.rels'
-IMG_DIR_NAME = 'word/media'
+DOCX_CONTENTS_FILE_NAME = 'word/document.xml'
+DOCX_RELS_FILE_NAME = 'word/_rels/document.xml.rels'
+DOCX_IMG_DIR_NAME = 'word/media'
 
 
 # Useful queries:
@@ -189,7 +190,6 @@ class DOCXParagraph(DOCXItem):
         return self._item.__repr__()
 
 
-
 class DOCXDocument(object):
     """Definition and common routines for docx document"""
 
@@ -222,7 +222,7 @@ class DOCXDocument(object):
         return self._zipfile
 
     def openDocxImage(self, image_name):
-        return self.getZipFile().open('%s/%s' % (IMG_DIR_NAME, image_name), 'r')
+        return self.getZipFile().open('%s/%s' % (DOCX_IMG_DIR_NAME, image_name), 'r')
 
     def load(self):
         self.loadRelationshipsData()
@@ -235,8 +235,8 @@ class DOCXDocument(object):
             self._zipfile = ZipFile(self.file_name, 'r')
             #dbg("Contents of the %s" % self.file_name)
             #dbg(self._zipfile.printdir())
-            self._rels = self._zipfile.open(RELS_FILE_NAME, 'r')
-            self._doc = self._zipfile.open(CONTENTS_FILE_NAME, 'r')
+            self._rels = self._zipfile.open(DOCX_RELS_FILE_NAME, 'r')
+            self._doc = self._zipfile.open(DOCX_CONTENTS_FILE_NAME, 'r')
             
             self._is_already_opened = True
 
@@ -340,16 +340,31 @@ class ASOZDParser(DOCXDocument):
             }
         self._results = D
 
-    def addResult(self, type, text, raw_text=None):
+    def addResult(self, type, text, raw_text=None, replace_check_re_with=None):
+        """Adding recognition result to internal storage"""
+
+        replacement = None if replace_check_re_with is None else replace_check_re_with
+        config_dont_replace = self.config['types'][type].get('do_not_replace_check_re')
+        
+        text_to_save = text
+        raw_text_to_save = raw_text
+        #dbg('>>> replacement: %s; config_dont_replace: %s' % (replacement, config_dont_replace))
+        #dbg('>>> %s' % text_to_save)
+        if not(replacement is None) and not config_dont_replace:
+            text_to_save = re.sub(self.config['types'][type]['check_re'], replacement, text_to_save)
+            # TO-DO: eliminate error if next two lines uncomment: TypeError: expected string or bytes-like object
+            #if raw_text_to_save:
+            #    raw_text_to_save = re.sub(self.config['types'][type]['check_re'], replacement, raw_text_to_save)
+        
         if self._results[type]['text']:
-            self._results[type]['text'] = self._results[type]['text'] + text
+            self._results[type]['text'] = self._results[type]['text'] + text_to_save
         else:
-            self._results[type]['text'] = text
+            self._results[type]['text'] = text_to_save
         
         if raw_text:
-            self._results[type]['raw_text'].append(raw_text)
+            self._results[type]['raw_text'].append(raw_text_to_save)
         else:
-            self._results[type]['raw_text'].append([text])
+            self._results[type]['raw_text'].append([text_to_save])
 
     def addResultImage(self, type, image_name):
         dbg("Adding image %s for recognized %s" % (image_name, type))
@@ -364,7 +379,8 @@ class ASOZDParser(DOCXDocument):
     def saveResultImages(self):
         for img_name in self._results['photo']['images']:
             dbg('Trying to save image: %s' % img_name)
-            filename = self.genFnameForResultImage(img_name)
+
+            filename = self.genAbsFnameForResultImage(img_name)
             if filename:
                 with open(filename, 'wb') as fimg:
                     try:
@@ -377,24 +393,47 @@ class ASOZDParser(DOCXDocument):
     def genFnameForResultJson(self):
         filename = self.getFIO()
         fileext = 'json'
-        return '%s\%s.%s' % (OUT_DIR, filename, fileext)
+        return '%s\%s\%s.%s' % (BASE_DIR, OUT_DIR, filename, fileext)
+
+    def genAbsFnameForResultImage(self, original_image_name):
+        filepath = self.genFnameForResultImage(original_image_name)
+        if filepath:
+            return '%s\%s' % (BASE_DIR, filepath)
+        else:
+            return None
 
     def genFnameForResultImage(self, original_image_name):
         filename = self.getFIO()
-        dbg('Trying to save image: %s' % original_image_name)
         m = re.search(r'\.(.+)$', original_image_name)
         if m:
             fileext = m.groups(1)[0]
-            dbg('Image name extenstion: %s' % fileext)
+            #dbg('Image name extenstion: %s' % fileext)
             if fileext:
-                return '%s\%s.%s' % (OUT_DIR, filename, fileext) 
+                return '%s\%s.%s' % (IMAGES_OUT_DIR, filename, fileext) 
         return None
+
+
+    def getResultsForSave(self):
+        res = {}
+        for x in self.config['types'].items():
+            dbg('--->' + x[0])
+            if self.config['types'][x[0]].get('list_of_strings') == True:
+                res[x[0]] = self._results[x[0]]['raw_text']
+            elif self.config['types'][x[0]].get('is_image') == True:
+                res[x[0]] = [self.genFnameForResultImage(img_name) for img_name in self._results[x[0]]['images']]
+            else:
+                res[x[0]] = self._results[x[0]]['text']
+        return res
+
 
     def saveResults(self):
         filepath = self.genFnameForResultJson()
-        open(filepath, 'w').write(json.dumps(self.getResults(), indent=3))
+        #open(filepath, 'w').write(json.dumps(self.getResults(), indent=3))
 
-    def getResults(self):
+        with io.open(filepath, 'w', encoding='utf8') as json_file:
+            json.dump(self.getResultsForSave(), json_file, ensure_ascii=False, indent=3)
+
+    def getInternalResults(self):
         return self._results
 
     def getConfig(self):
@@ -429,7 +468,7 @@ class ASOZDParser(DOCXDocument):
 
         for r in self._re_list.items():
             tmp_re = re.compile(r[0])
-            dbg('Trying to recognize paragraph as %s with regex %s' % (r[1], r[0]))
+            dbg('Trying to recognize paragraph [%s] as %s with regex %s' % (p.getId(), r[1], r[0]))
             if tmp_re.match(p.getCleanedText().strip()):
 
                 not_re = self.config['types'][r[1]].get('not_re')
@@ -467,7 +506,7 @@ class ASOZDParser(DOCXDocument):
             p = DOCXParagraph(praw, docx=Doc)
             self.addParagraph(p)
             dbg('----> (%02d) Paragraph '%pi+p.getId())
-            dbg('Text: %s' % repr(p))
+            #dbg('Text: %s' % repr(p))
             p_type = self.recognizeParagraph(p)
 
             if p_type:
@@ -478,7 +517,7 @@ class ASOZDParser(DOCXDocument):
                 last_recognized_type = p_type
                 #last_recognized_pi = pi
 
-                self.addResult(p_type, p.getText(), p.getRawText())
+                self.addResult(p_type, p.getText(), p.getRawText(), replace_check_re_with='')
 
                 extra_types_list = self.config['types'][p_type].get('also_contains')
                 if extra_types_list:
@@ -516,7 +555,7 @@ if __name__ == '__main__':
     #print(P.getParagraphsId())
     #print(P.getParagraphsText())
 
-    pprint(P.getResults())
+    pprint(P.getInternalResults())
 
     P.saveResults()
     P.saveResultImages()
