@@ -1,0 +1,9 @@
+# virtual env and ide settings
+.env
+.vscode
+
+# python
+**/*.pyc
+
+# test documents
+**/*.docx
