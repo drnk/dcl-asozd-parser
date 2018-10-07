@@ -15,6 +15,12 @@ IN_DIR = BASE_DIR + '\in'
 OUT_DIR = BASE_DIR + '\out'
 IMAGES_OUT_DIR = OUT_DIR + '\images'
 
+
+CONTENTS_FILE_NAME = 'word/document.xml'
+RELS_FILE_NAME = 'word/_rels/document.xml.rels'
+IMG_DIR_NAME = 'word/media'
+
+
 # Useful queries:
 # open('parser_config.json', 'w').write(json.dumps(P, indent=4))
 
@@ -25,9 +31,6 @@ def dbg(msg):
     if DEBUG: 
         pprint(msg)
 
-#CONTENTS_FILE_NAME = 'word/document.xml'
-#RELS_FILE_NAME = 'word/_rels/document.xml.rels'
-#IMG_DIR_NAME = 'word/media/'
 
 CLEANING_REGEXP = re.compile('<[^>]+>')
 
@@ -190,9 +193,6 @@ class DOCXParagraph(DOCXItem):
 class DOCXDocument(object):
     """Definition and common routines for docx document"""
 
-    CONTENTS_FILE_NAME = 'word/document.xml'
-    RELS_FILE_NAME = 'word/_rels/document.xml.rels'
-    IMG_DIR_NAME = 'word/media'
 
     RD = {}
 
@@ -222,7 +222,7 @@ class DOCXDocument(object):
         return self._zipfile
 
     def openDocxImage(self, image_name):
-        return self.getZipFile().open('%s/%s' % (self.IMG_DIR_NAME, image_name), 'r')
+        return self.getZipFile().open('%s/%s' % (IMG_DIR_NAME, image_name), 'r')
 
     def load(self):
         self.loadRelationshipsData()
@@ -235,8 +235,8 @@ class DOCXDocument(object):
             self._zipfile = ZipFile(self.file_name, 'r')
             #dbg("Contents of the %s" % self.file_name)
             #dbg(self._zipfile.printdir())
-            self._rels = self._zipfile.open(self.RELS_FILE_NAME, 'r')
-            self._doc = self._zipfile.open(self.CONTENTS_FILE_NAME, 'r')
+            self._rels = self._zipfile.open(RELS_FILE_NAME, 'r')
+            self._doc = self._zipfile.open(CONTENTS_FILE_NAME, 'r')
             
             self._is_already_opened = True
 
@@ -361,23 +361,38 @@ class ASOZDParser(DOCXDocument):
     def getFIO(self):
         return self._results['fio']['text']
 
-    def saveImages(self):
+    def saveResultImages(self):
         for img_name in self._results['photo']['images']:
             dbg('Trying to save image: %s' % img_name)
-            m = re.search(r'\.(.+)$', img_name)
-            if m:
-                img_ext = m.groups(1)[0]
-                dbg('Image name extenstion: %s' % img_ext)
-                if img_ext:
-                    dest_fname = '%s\%s.%s' % (IMAGES_OUT_DIR, self.getFIO(), img_ext) 
-                    dbg('Destination file name: %s' % dest_fname)
-                    with open(dest_fname, 'wb') as fimg:
-                        try:
-                            doc = self.getDoc()
-                            docx_img = doc.openDocxImage(img_name)
-                            shutil.copyfileobj(docx_img, fimg)
-                        finally:
-                            docx_img.close()
+            filename = self.genFnameForResultImage(img_name)
+            if filename:
+                with open(filename, 'wb') as fimg:
+                    try:
+                        doc = self.getDoc()
+                        docx_img = doc.openDocxImage(img_name)
+                        shutil.copyfileobj(docx_img, fimg)
+                    finally:
+                        docx_img.close()
+
+    def genFnameForResultJson(self):
+        filename = self.getFIO()
+        fileext = 'json'
+        return '%s\%s.%s' % (OUT_DIR, filename, fileext)
+
+    def genFnameForResultImage(self, original_image_name):
+        filename = self.getFIO()
+        dbg('Trying to save image: %s' % original_image_name)
+        m = re.search(r'\.(.+)$', original_image_name)
+        if m:
+            fileext = m.groups(1)[0]
+            dbg('Image name extenstion: %s' % fileext)
+            if fileext:
+                return '%s\%s.%s' % (OUT_DIR, filename, fileext) 
+        return None
+
+    def saveResults(self):
+        filepath = self.genFnameForResultJson()
+        open(filepath, 'w').write(json.dumps(self.getResults(), indent=3))
 
     def getResults(self):
         return self._results
@@ -503,4 +518,5 @@ if __name__ == '__main__':
 
     pprint(P.getResults())
 
-    P.saveImages()
+    P.saveResults()
+    P.saveResultImages()
