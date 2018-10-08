@@ -7,8 +7,9 @@ import re
 import json
 import operator
 import shutil
-import os
-import io
+import os, sys, io
+from stat import *
+
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -183,7 +184,7 @@ class DOCXParagraph(DOCXItem):
             if el:
                 txt = el.getText()
                 if txt:
-                    res.append([txt])
+                    res.append(txt)
         return res
 
     def __repr__(self):
@@ -343,18 +344,22 @@ class ASOZDParser(DOCXDocument):
     def addResult(self, type, text, raw_text=None, replace_check_re_with=None):
         """Adding recognition result to internal storage"""
 
-        replacement = None if replace_check_re_with is None else replace_check_re_with
+        #replacement = None if replace_check_re_with is None else replace_check_re_with
+        replacement = replace_check_re_with
         config_dont_replace = self.config['types'][type].get('do_not_replace_check_re')
         
         text_to_save = text
+        #raw_text_to_save = [x[0] for x in raw_text]
         raw_text_to_save = raw_text
-        #dbg('>>> replacement: %s; config_dont_replace: %s' % (replacement, config_dont_replace))
-        #dbg('>>> %s' % text_to_save)
+        dbg('>>> replacement: %s; config_dont_replace: %s' % (replacement, config_dont_replace))
+        dbg('>>> %s' % text_to_save)
         if not(replacement is None) and not config_dont_replace:
             text_to_save = re.sub(self.config['types'][type]['check_re'], replacement, text_to_save)
+            dbg('--->>> raw_text_to_save %s' % raw_text_to_save)
             # TO-DO: eliminate error if next two lines uncomment: TypeError: expected string or bytes-like object
-            #if raw_text_to_save:
-            #    raw_text_to_save = re.sub(self.config['types'][type]['check_re'], replacement, raw_text_to_save)
+            if raw_text_to_save:
+                if re.sub(self.config['types'][type]['check_re'], replacement, raw_text_to_save[0]) == '':
+                    raw_text_to_save.remove(raw_text_to_save[0])
         
         if self._results[type]['text']:
             self._results[type]['text'] = self._results[type]['text'] + text_to_save
@@ -364,7 +369,7 @@ class ASOZDParser(DOCXDocument):
         if raw_text:
             self._results[type]['raw_text'].append(raw_text_to_save)
         else:
-            self._results[type]['raw_text'].append([text_to_save])
+            self._results[type]['raw_text'].append(text_to_save)
 
     def addResultImage(self, type, image_name):
         dbg("Adding image %s for recognized %s" % (image_name, type))
@@ -418,7 +423,8 @@ class ASOZDParser(DOCXDocument):
         for x in self.config['types'].items():
             dbg('--->' + x[0])
             if self.config['types'][x[0]].get('list_of_strings') == True:
-                res[x[0]] = self._results[x[0]]['raw_text']
+                #dbg('--->List of Strings: %s' % self._results[x[0]]['raw_text'])
+                res[x[0]] = [x[0] for x in self._results[x[0]]['raw_text']]
             elif self.config['types'][x[0]].get('is_image') == True:
                 res[x[0]] = [self.genFnameForResultImage(img_name) for img_name in self._results[x[0]]['images']]
             else:
@@ -533,6 +539,7 @@ class ASOZDParser(DOCXDocument):
 
 
             elif last_recognized_type:
+                dbg('Paragraph hasn''t recognized. Add data to the last recognized as [%s]' % last_recognized_type)
                 self.addResult(last_recognized_type, p.getText(), p.getRawText())
             else:
                 print('Warning! Paragraph iter %d was skipped.' % pi)
@@ -546,16 +553,31 @@ if __name__ == '__main__':
     parser.add_argument('fname', metavar='fileName', type=str, help='file name for convert')
     args = parser.parse_args()
 
-    # parser init
-    P = ASOZDParser(args.fname)
-    
-    # parse start
-    P.loadParagraphs()
-    #print(P.getOrderedConfig())
-    #print(P.getParagraphsId())
-    #print(P.getParagraphsText())
+    mode = os.stat(args.fname)[ST_MODE]
+    is_directory = False
+    if S_ISDIR(mode):
+        # directory
+        target_list = os.listdir(args.fname)
+        is_directory = True
+    elif S_ISREG(mode):
+        # file
+        target_list = [args.fname]
+    else:
+        raise ValueError("fileName [%s] contains non folder and non file value")
 
-    pprint(P.getInternalResults())
+    for fname in target_list:
+        if not fname.endswith('.docx'):
+            print('Skipping %s as non supportable file.' % fname)
+            continue
 
-    P.saveResults()
-    P.saveResultImages()
+        print('Looking %s file for valuable content.' % fname)
+        # parser init
+        P = ASOZDParser(args.fname + '\\' + fname if is_directory else args.fname)
+        
+        # parse start
+        P.loadParagraphs()
+
+        pprint(P.getInternalResults())
+
+        P.saveResults()
+        P.saveResultImages()
