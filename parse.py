@@ -172,6 +172,7 @@ class ASOZDParser(DOCXDocument):
         return None
 
 
+
     def getResultsForSave(self):
         res = {}
         for x in self.config['types'].items():
