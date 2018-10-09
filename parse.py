@@ -8,7 +8,11 @@ import json
 import operator
 import shutil
 import os, sys, io
-from stat import *
+
+#from stat import *
+from stat import ST_MODE, S_ISDIR, S_ISREG
+from DOCX import DOCXDocument, DOCXParagraph, DOCXItem
+
 
 
 
@@ -18,9 +22,6 @@ OUT_DIR = '\out'
 IMAGES_OUT_DIR = OUT_DIR + '\images'
 
 
-DOCX_CONTENTS_FILE_NAME = 'word/document.xml'
-DOCX_RELS_FILE_NAME = 'word/_rels/document.xml.rels'
-DOCX_IMG_DIR_NAME = 'word/media'
 
 
 # Useful queries:
@@ -32,253 +33,6 @@ def dbg(msg):
     global DEBUG
     if DEBUG: 
         pprint(msg)
-
-
-CLEANING_REGEXP = re.compile('<[^>]+>')
-
-class DOCXItem(object):
-    __metaclass__ = abc.ABCMeta
-    EXCLUDE_LIST = ('pPr', 'rPr')
-
-    def __init__(self, item, *args, **kwargs):
-        #dbg('DOCXItem.__init__:', type(item), isinstance(item, element.Tag))
-        if isinstance(item, element.Tag):
-            self._item = item
-            if kwargs.get('docx'):
-                self._doc = kwargs['docx']
-
-    def getDoc(self):
-        return self._doc
-    
-    @staticmethod
-    def factory(item, *args, **kwargs):
-        if isinstance(item, element.Tag):
-            if item.name == "p": 
-                return DOCXParagraph(item, *args, **kwargs)
-            if item.name == "r":
-                return DOCXRun(item, *args, **kwargs)
-            if item.name == "hyperlink":
-                return DOCXHyperlink(item, *args, **kwargs)
-            if item.name == "drawing":
-                return DOCXDrawing(item, *args, **kwargs)
-
-        return None
-    
-    @abc.abstractmethod
-    def getChildren(self):
-        """Returns children elements"""
-        pass
-    
-    @abc.abstractmethod
-    def getText(self):
-        """Returns text representation of the element"""
-        pass
-
-    def __str__(self):
-        return self.getText()
-
-    def getCleanedText(self):
-        return CLEANING_REGEXP.sub('', self.getText())
-        #return self._item.get_text()
-
-
-class DOCXText(DOCXItem):
-    """Representation of w:t docx element"""
-    full_tag_name = 'w:t'
-    tag_name = 't'
-
-    def getText(self):
-        return self._item.text
-
-class DOCXDrawing(DOCXItem):
-    """Representation of w:drawing docx element"""
-    full_tag_name = 'w:drawing'
-    tag_name = 'drawing'
-
-    def getText(self):
-        return None
-    
-    def getImageName(self):
-        pic_tag = self._item.find('pic:cNvPr')
-        if pic_tag:
-            return pic_tag.get('name')
-        else:
-            return None
-    
-
-class DOCXRun(DOCXItem):
-    """Representation of w:r docx element"""
-    full_tag_name = 'w:r'
-    tag_name = 'r'
-
-    def getText(self):
-        t = self._item.find(DOCXText.full_tag_name)
-        if t:
-            return t.text
-        else:
-            return None
-
-    def getCleanedText(self):
-        return self._item.get_text()
-
-         
-class DOCXHyperlink(DOCXItem):
-    """Representation of w:t docx element"""
-
-    full_tag_name = 'w:hyperlink'
-    tag_name = 'hyperlink'
-
-    def getRelationshipId(self):
-        return self._item.get('r:id')
-
-    def getText(self):
-        # calculate ref target
-        href = None
-        if self._doc:
-            href = self._doc.RD[self.getRelationshipId()]['Target']
-
-        text = DOCXRun(self._item.find(DOCXRun.full_tag_name)).getText()
-        return '<a href="%s">%s</a>' % (href, text)
-
-    def getCleanedText(self):
-        return self._item.get_text()
-
-
-class DOCXParagraph(DOCXItem):
-    """Paragraph definition for docs document"""
-    
-    full_tag_name = 'w:p'
-    tag_name = 'p'
-
-    _id = None
-
-    def __init__(self, item, *args, **kwargs):
-        super(DOCXParagraph, self).__init__(item, *args, **kwargs)
-        
-        if self._item.name == 'p':
-            self._id = item.attrs['w14:paraId']
-    
-    def getImages(self):
-        return self._item.findChildren(DOCXDrawing.full_tag_name, recursive=True) 
-
-    def getId(self):
-        return self._id
-
-    def getChildren(self):
-        return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST, recursive=False)
-
-    def getText(self):
-        res = ''
-        for item in self.getChildren():
-            el = DOCXItem.factory(item, docx=self.getDoc())
-            if el:
-                txt = el.getText()
-                if txt:
-                    res = res + txt
-        return res
-
-    def getRawText(self):
-        res = []
-        for item in self.getChildren():
-            el = DOCXItem.factory(item, docx=self.getDoc())
-            if el:
-                txt = el.getText()
-                if txt:
-                    res.append(txt)
-        return res
-
-    def __repr__(self):
-        return self._item.__repr__()
-
-
-class DOCXDocument(object):
-    """Definition and common routines for docx document"""
-
-
-    RD = {}
-
-    _DEBUG = True
-    _is_already_opened = False
-
-    def __init__(self, file_name, *args, **kwargs):
-        self.file_name = file_name
-
-        if kwargs.get('debug'):
-            self._DEBUG = kwargs['debug']
-
-        self._openDocx()
-
-
-    def __enter__(self):
-        self._openDocx()
-        return self
-    
-    def __exit__(self, type, value, traceback):
-        #Exception handling here
-        self._rels.close()
-        self._doc.close()
-        self._zipfile.close()
-
-    def getZipFile(self):
-        return self._zipfile
-
-    def openDocxImage(self, image_name):
-        return self.getZipFile().open('%s/%s' % (DOCX_IMG_DIR_NAME, image_name), 'r')
-
-    def load(self):
-        self.loadRelationshipsData()
-        self.loadDocumentData()
-
-    def _openDocx(self):
-        """Open docx document and set pointer objects for Relationships and Document content"""
-        if not self._is_already_opened:
-            
-            self._zipfile = ZipFile(self.file_name, 'r')
-            #dbg("Contents of the %s" % self.file_name)
-            #dbg(self._zipfile.printdir())
-            self._rels = self._zipfile.open(DOCX_RELS_FILE_NAME, 'r')
-            self._doc = self._zipfile.open(DOCX_CONTENTS_FILE_NAME, 'r')
-            
-            self._is_already_opened = True
-
-
-    def getDocumentRawData(self):
-        """Return raw Document data from docx file"""
-        return self._doc.read()
-
-
-    def getRelationshipsRawData(self):
-        """Return raw Relationships data from docx file"""
-        return self._rels.read()
-
-
-    def loadRelationshipsData(self):
-        """Load Relationships data into internal sturcture"""
-        self.RD = {}
-
-        rs = BeautifulSoup(self.getRelationshipsRawData(), 'lxml-xml')
-        for r in rs.find_all('Relationship'):
-            self.RD[r['Id']] = {
-                'Id': r.get('Id'),
-                'Type': r.get('Type'),
-                'Target': r.get('Target'),
-                'TargetMode': r.get('TargetMode'),
-            }
-
-
-    def loadDocumentData(self):
-        """Load Document data into internal sturcture"""
-        raw = BeautifulSoup(self.getDocumentRawData(), 'lxml-xml')
-        self._docx_body = raw.find('w:body')
-        if self._docx_body is None:
-            raise ValueError('Couldn''t find <w:body> withing loaded docs document %s' % self.file_name)
-        
-        self._docx_paragraph_iterator = self._docx_body.findChildren(DOCXParagraph.full_tag_name)
-
-
-    def getDocParagraphsIter(self):
-        return self._docx_paragraph_iterator
-
 
 
 
@@ -424,7 +178,11 @@ class ASOZDParser(DOCXDocument):
             dbg('--->' + x[0])
             if self.config['types'][x[0]].get('list_of_strings') == True:
                 #dbg('--->List of Strings: %s' % self._results[x[0]]['raw_text'])
-                res[x[0]] = [x[0] for x in self._results[x[0]]['raw_text']]
+                try:
+                    res[x[0]] = [y for y in self._results[x[0]]['raw_text']]
+                except:
+                    pprint('Error data %s:' % self._results[x[0]])
+                    pprint(self._results[x[0]])
             elif self.config['types'][x[0]].get('is_image') == True:
                 res[x[0]] = [self.genFnameForResultImage(img_name) for img_name in self._results[x[0]]['images']]
             else:
@@ -549,18 +307,31 @@ class ASOZDParser(DOCXDocument):
 
 if __name__ == '__main__':
     # arguments definition
-    parser = argparse.ArgumentParser(description='Convert ASOZD details docx into json.')
-    parser.add_argument('fname', metavar='fileName', type=str, help='file name for convert')
+    parser = argparse.ArgumentParser(description="""Convert ASOZD details docx into json.
+
+Example (Windows): python parser.py "in"
+                   python parser.py "filename.docx"
+                   
+Example (Unix): ./parser.py "in"
+                ./parser.py "filename.docx\"""", formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('fname', metavar='fileName', type=str, help='Filename or directory with *.docx files for processing')
     args = parser.parse_args()
 
-    mode = os.stat(args.fname)[ST_MODE]
+    try:
+        mode = os.stat(args.fname)[ST_MODE]
+    except FileNotFoundError:
+        raise ValueError("Couldn't determine is [%s] a folder or file. Possible " % args.fname +\
+            "the name is incorrect. Please verify.")
+
     is_directory = False
     if S_ISDIR(mode):
         # directory
+        print('Directory detected: %s' % args.fname)
         target_list = os.listdir(args.fname)
         is_directory = True
     elif S_ISREG(mode):
         # file
+        print('File detected: %s' % args.fname)
         target_list = [args.fname]
     else:
         raise ValueError("fileName [%s] contains non folder and non file value")
