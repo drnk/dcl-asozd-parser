@@ -55,7 +55,7 @@ config = {
         'family': {
             'order_id': 8,
             'name': 'family',
-            'text_re': r'(<a[^>]+>)?([А-Яа-я\s]+)?(Женат|женат).*?(?<!г)\.', # regexp for retrieving extra content 
+            'text_re': r'(<a[^>]+>)?([А-Яа-я\s]+)?(Женат|женат|замужем|Замужем).*?(?<!г)\.', # regexp for retrieving extra content 
                                                                              # data from  paragraph text
             'leave_also_contains_data': False, # don't touch data matched to text_re within original text,
                                                # otherwise data will be cropped
