@@ -1,7 +1,7 @@
 import argparse
 from zipfile import ZipFile
 from bs4 import BeautifulSoup, element
-from pprint import pprint
+from pprint import pprint, PrettyPrinter
 import abc
 import re
 import json
@@ -95,35 +95,64 @@ class ASOZDParser(DOCXDocument):
             }
         self._results = D
 
-    def addResult(self, type, text, raw_text=None, replace_check_re_with=None):
-        """Adding recognition result to internal storage"""
+    def get_config(self, type, key):
+        """Returns config 'key' value for specified 'type'"""
+        return self.config['types'][type].get(key)
 
-        #replacement = None if replace_check_re_with is None else replace_check_re_with
+    def addResult(self, type, text, raw_text=None, replace_check_re_with=None):
+        """Adds recognition result to internal storage"""
+
         replacement = replace_check_re_with
-        config_dont_replace = self.config['types'][type].get('do_not_replace_check_re')
+        config_dont_replace = self.get_config(type, 'do_not_replace_check_re')
         
+        #pp = PrettyPrinter()
+        #print('addResult(type=%s, text=%s, raw_text=%s, replace_check_re_with=%s)' % (
+        #    type,
+        #    pp.pformat(text),
+        #    pp.pformat(raw_text),
+        #    pp.pformat(replace_check_re_with)
+        #))
+
         text_to_save = text
         #raw_text_to_save = [x[0] for x in raw_text]
-        raw_text_to_save = raw_text
-        dbg('>>> replacement: %s; config_dont_replace: %s' % (replacement, config_dont_replace))
-        dbg('>>> %s' % text_to_save)
+        raw_text_to_save = raw_text.copy()
+
+        #dbg('>>> replacement: %s; config_dont_replace: %s' % (replacement, config_dont_replace))
+
         if not(replacement is None) and not config_dont_replace:
+            # replace find pattern string in plain text
             text_to_save = re.sub(self.config['types'][type]['check_re'], replacement, text_to_save)
-            dbg('--->>> raw_text_to_save %s' % raw_text_to_save)
-            # TO-DO: eliminate error if next two lines uncomment: TypeError: expected string or bytes-like object
+
+            # replace find pattern string in raw text list
             if raw_text_to_save:
                 if re.sub(self.config['types'][type]['check_re'], replacement, raw_text_to_save[0]) == '':
+                    dbg('Raw-text-to-save element removed %s' % raw_text_to_save[0])
                     raw_text_to_save.remove(raw_text_to_save[0])
         
+        # adding plain text to internal storage
         if self._results[type]['text']:
             self._results[type]['text'] = self._results[type]['text'] + text_to_save
         else:
             self._results[type]['text'] = text_to_save
         
+        # adding raw text list to internal storage
+        if type == 'lobby':
+            print('raw_text = %s' % raw_text)
+            print('raw_text_to_save = %s' % raw_text_to_save)
         if raw_text:
-            self._results[type]['raw_text'].append(raw_text_to_save)
+            if raw_text_to_save:
+                # it is possible that raw_text contain a string with line separators (come from w:br)
+                # here we split this kind of text
+                tmp = []
+                for y in [x.split(os.linesep) for x in raw_text_to_save]:
+                    if type == 'lobby':
+                        print('Iterating [%s]' % y)
+                    if y != "":
+                        tmp = tmp + y
+                
+                self._results[type]['raw_text'] = self._results[type]['raw_text'] + [x for x in tmp if x != ""]
         else:
-            self._results[type]['raw_text'].append(text_to_save)
+            self._results[type]['raw_text'].append(text_to_save.split(os.linesep))
 
     def addResultImage(self, type, image_name):
         dbg("Adding image %s for recognized %s" % (image_name, type))
@@ -136,18 +165,20 @@ class ASOZDParser(DOCXDocument):
         return self._results['fio']['text']
 
     def saveResultImages(self):
-        for img_name in self._results['photo']['images']:
-            dbg('Trying to save image: %s' % img_name)
+        if self._results['photo'].get('images'):
+            for img_name in self._results['photo']['images']:
+                dbg('Trying to save image: %s' % img_name)
 
-            filename = self.genAbsFnameForResultImage(img_name)
-            if filename:
-                with open(filename, 'wb') as fimg:
-                    try:
-                        doc = self.getDoc()
-                        docx_img = doc.openDocxImage(img_name)
-                        shutil.copyfileobj(docx_img, fimg)
-                    finally:
-                        docx_img.close()
+                filename = self.genAbsFnameForResultImage(img_name)
+                if filename:
+                    with open(filename, 'wb') as fimg:
+                        try:
+                            doc = self.getDoc()
+                            docx_img = doc.openDocxImage(img_name)
+                            shutil.copyfileobj(docx_img, fimg)
+                        finally:
+                            docx_img.close()
+                dbg('Image saved.')
 
     def genFnameForResultJson(self):
         filename = self.getFIO()
@@ -176,7 +207,6 @@ class ASOZDParser(DOCXDocument):
     def getResultsForSave(self):
         res = {}
         for x in self.config['types'].items():
-            dbg('--->' + x[0])
             if self.config['types'][x[0]].get('list_of_strings') == True:
                 #dbg('--->List of Strings: %s' % self._results[x[0]]['raw_text'])
                 try:
@@ -185,7 +215,8 @@ class ASOZDParser(DOCXDocument):
                     pprint('Error data %s:' % self._results[x[0]])
                     pprint(self._results[x[0]])
             elif self.config['types'][x[0]].get('is_image') == True:
-                res[x[0]] = [self.genFnameForResultImage(img_name) for img_name in self._results[x[0]]['images']]
+                if self._results[x[0]].get('images'):
+                    res[x[0]] = [self.genFnameForResultImage(img_name) for img_name in self._results[x[0]]['images']]
             else:
                 res[x[0]] = self._results[x[0]]['text']
         return res
@@ -230,17 +261,17 @@ class ASOZDParser(DOCXDocument):
         return [p['ref'] for p in self.pStorage]
 
     def recognizeParagraph(self, p):
-
+        #dbg('Paragraph text (%s): %s' % (p._item.tag, p.getCleanedText()))
         for r in self._re_list.items():
             tmp_re = re.compile(r[0])
-            dbg('Trying to recognize paragraph [%s] as %s with regex %s' % (p.getId(), r[1], r[0]))
+            #dbg('Trying to recognize paragraph [%s] as %s with regex %s' % (p.getId(), r[1], r[0]))
             if tmp_re.match(p.getCleanedText().strip()):
 
                 not_re = self.config['types'][r[1]].get('not_re')
                 if not_re:
                     tmp_not_re = re.compile(not_re)
                     if not tmp_not_re.match(p.getCleanedText().strip()):
-                        dbg('Paragraph text: '+p.getCleanedText())
+                        #dbg('Paragraph text: '+p.getCleanedText())
                         return r[1]
                     else:
                         pass
@@ -270,8 +301,12 @@ class ASOZDParser(DOCXDocument):
 
             p = DOCXParagraph(praw, docx=Doc)
             self.addParagraph(p)
-            dbg('----> (%02d) Paragraph '%pi+p.getId())
-            #dbg('Text: %s' % repr(p))
+            dbg('----> (%02d) Paragraph '%pi + p.getId())
+            
+            if p.getCleanedText().strip() == '':
+                dbg('Paragraph %s text is empty. Skipping it.' % p.getId())
+                continue
+            
             p_type = self.recognizeParagraph(p)
 
             if p_type:
@@ -338,7 +373,7 @@ Example (Unix): ./parser.py "in"
         raise ValueError("fileName [%s] contains non folder and non file value")
 
     for fname in target_list:
-        if not fname.endswith('.docx'):
+        if not fname.endswith('.docx') or fname.startswith('~$'):
             print('Skipping %s as non supportable file.' % fname)
             continue
 
@@ -349,7 +384,7 @@ Example (Unix): ./parser.py "in"
         # parse start
         P.loadParagraphs()
 
-        pprint(P.getInternalResults())
+        #pprint(P.getInternalResults())
 
         P.saveResults()
         P.saveResultImages()

@@ -1,5 +1,6 @@
 import abc
 import re
+import os
 
 from bs4 import element
 
@@ -9,6 +10,9 @@ CLEANING_REGEXP = re.compile('<[^>]+>')
 
 class DOCXItem(object):
     __metaclass__ = abc.ABCMeta
+    
+    _doc = None # reference to Document
+
     EXCLUDE_LIST = ('pPr', 'rPr')
 
     def __init__(self, item, *args, **kwargs):
@@ -32,6 +36,10 @@ class DOCXItem(object):
                 return DOCXHyperlink(item, *args, **kwargs)
             if item.name == "drawing":
                 return DOCXDrawing(item, *args, **kwargs)
+            if item.name == "br":
+                return DOCXBr(item, *args, **kwargs)
+            if item.name == "t":
+                return DOCXText(item, *args, **kwargs)
 
         return None
     
@@ -77,13 +85,17 @@ class DOCXParagraph(DOCXItem):
         return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST, recursive=False)
 
     def getText(self):
+        #print('Pargraph(%s).getText() start' % self.getId())
         res = ''
+        #print('Paragraph children: %s' % self.getChildren())
         for item in self.getChildren():
             el = DOCXItem.factory(item, docx=self.getDoc())
+            #print('Working on children %s' % el.tag_name)
             if el:
                 txt = el.getText()
                 if txt:
                     res = res + txt
+        #print('Pargraph(%s).getText() stop' % self.getId())
         return res
 
     def getRawText(self):
@@ -139,25 +151,52 @@ class DOCXHyperlink(DOCXItem):
 
 
 class DOCXRun(DOCXItem):
-    """Representation of w:r docx element"""
+    """
+    Representation of <w:r> docx element
+
+    Runs most commonly contain text elements <w:t>
+    (which contain the actual literal text of a pararaph),
+    but they may also contain such special content as symbols,
+    tabs, hyphens, carriage returns, drawings, breaks,
+    and footnote references.
+
+    Current versions supports only <w:t> and <w:br> elements
+    """
+    
     full_tag_name = 'w:r'
     tag_name = 'r'
 
     def getText(self):
-        t = self._item.find(DOCXText.full_tag_name)
-        if t:
-            return t.text
-        else:
-            return None
+        res = ''
+        for item in self._item.findChildren(
+                        [DOCXText.full_tag_name, DOCXBr.full_tag_name],
+                        recursive=False):
+            
+            el = DOCXItem.factory(item, docx=self.getDoc())
+            if el:
+                txt = el.getText()
+                if txt:
+                    res = res + txt
+        return res
 
     def getCleanedText(self):
         return self._item.get_text()
 
 
 class DOCXText(DOCXItem):
-    """Representation of w:t docx element"""
+    """Representation of <w:t> docx element"""
+
     full_tag_name = 'w:t'
     tag_name = 't'
 
     def getText(self):
         return self._item.text
+
+class DOCXBr(DOCXItem):
+    """Representation of <w:br> docx element"""
+
+    full_tag_name = 'w:br'
+    tag_name = 'br'
+
+    def getText(self):
+        return os.linesep

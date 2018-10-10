@@ -88,8 +88,10 @@ class DOCXDocument(object):
         if self._docx_body is None:
             raise ValueError('Couldn''t find <w:body> withing loaded docs document %s' % self.file_name)
         
-        self._docx_paragraph_iterator = self._docx_body.findChildren(DOCXParagraph.full_tag_name)
+        self._docx_paragraph_iterator = self._docx_body.findChildren(DOCXParagraph.full_tag_name, recursive=False)
 
 
     def getDocParagraphsIter(self):
+        """Returns list of document paragraphs"""
+        #print('Document paragraph list length: %d' % len(self._docx_paragraph_iterator))
         return self._docx_paragraph_iterator
