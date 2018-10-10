@@ -113,7 +113,7 @@ class ASOZDParser(DOCXDocument):
         #    pp.pformat(replace_check_re_with)
         #))
 
-        text_to_save = text
+        text_to_save = text.strip()
         #raw_text_to_save = [x[0] for x in raw_text]
         raw_text_to_save = raw_text.copy()
 
@@ -162,7 +162,7 @@ class ASOZDParser(DOCXDocument):
             self._results[type]['images'] = [image_name]
     
     def getFIO(self):
-        return self._results['fio']['text']
+        return self._results['fio']['text'].strip()
 
     def saveResultImages(self):
         if self._results['photo'].get('images'):
@@ -309,21 +309,21 @@ class ASOZDParser(DOCXDocument):
             
             p_type = self.recognizeParagraph(p)
 
-            if p_type:
-                # start of docx part which could be related to 
-                # one of the target data parts
-                dbg('Paragraph recognized as [%s]' % p_type)
+            if p_type or last_recognized_type:
 
-                last_recognized_type = p_type
-                #last_recognized_pi = pi
+                par_text = p.getText()
+                par_raw_text = p.getRawText()
 
-                self.addResult(p_type, p.getText(), p.getRawText(), replace_check_re_with='')
+                work_type = p_type if p_type else last_recognized_type
 
-                extra_types_list = self.config['types'][p_type].get('also_contains')
+                # determine if we have to find something within recognized paragraph
+                extra_types_list = self.get_config(work_type, 'also_contains')
                 if extra_types_list:
+
                     dbg('Found %d extra types: %s' % (len(extra_types_list), extra_types_list))
+                    
                     for extra_type in extra_types_list:
-                        if self.config['types'][extra_type].get('is_image'):
+                        if self.get_config(extra_type, 'is_image'):
                             dbg('Try to find images within paragraph')
                             for img in p.getImages():
                                 drw = DOCXItem.factory(img, docx=Doc)
@@ -331,10 +331,28 @@ class ASOZDParser(DOCXDocument):
                                 dbg('Image %s found' % img_name)
                                 self.addResultImage(extra_type, img_name)
 
+                        elif self.get_config(extra_type, 'text_re'):
+                            print('Found text_re for %s' % extra_type)
+                            print('Searching [%s] in [%s]' % (self.get_config(extra_type, 'text_re'), par_text))
+                            m = re.search(self.get_config(extra_type, 'text_re'), par_text)
+                            if m:
+                                search_res = m.group(0).strip()
+                                self.addResult(extra_type, search_res, [search_res])
+                                if not self.get_config(extra_type, 'leave_also_contains_data'):
+                                    par_text = par_text.replace(search_res, '')
+                                
+                if p_type:
+                    # start of docx part which could be related to 
+                    # one of the target data parts
+                    dbg('Paragraph recognized as [%s]' % p_type)
 
-            elif last_recognized_type:
-                dbg('Paragraph hasn''t recognized. Add data to the last recognized as [%s]' % last_recognized_type)
-                self.addResult(last_recognized_type, p.getText(), p.getRawText())
+                    last_recognized_type = p_type
+                    
+                    # save main recognition result
+                    self.addResult(p_type, par_text, par_raw_text, replace_check_re_with='')
+                elif last_recognized_type:
+                    dbg('Paragraph hasn''t recognized. Add data to the last recognized as [%s]' % last_recognized_type)
+                    self.addResult(last_recognized_type, par_text, par_raw_text)
             else:
                 print('Warning! Paragraph iter %d was skipped.' % pi)
             

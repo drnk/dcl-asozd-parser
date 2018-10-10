@@ -2,17 +2,21 @@ config = {
     'types': {
         'fio': {
             'order_id': 1,
-            'check_re': r'[А-Я][а-я]+\s+[А-Я][а-я]+\s+[А-Я][а-я]+',
-            'not_re': r'^Депутат Государственной Думы',
-            'also_contains': ['photo'],
-            'next_items': ['position'],
-            'name': 'fio',
-            'do_not_replace_check_re': True, 
+            'check_re': r'[А-Я][а-я]+\s+[А-Я][а-я]+\s+[А-Я][а-я]+', # regexp for recognizing paragraph
+            'not_re': r'^Депутат Государственной Думы',             # extra regexp to not to match to
+                                                                    # avoid incorrect recognitions 
+            'also_contains': ['photo'], # list of extra content types which could
+                                        # be found within current paragraph
+            'next_items': ['position'], # actually not used
+            'name': 'fio', 
+            'do_not_replace_check_re': True, # leave data matched to 'check_re' regexp
+                                             # otherwise matched data will be cropped 
         },
         'photo': {
             'order_id': 2,
             'name': 'photo',
-            'is_image': True,
+            'is_image': True, # says that content type is image and we have to find
+                              # <w:drawing> tags and save images from them
         },
         'position': {
             'order_id': 3,
@@ -51,6 +55,16 @@ config = {
         'family': {
             'order_id': 8,
             'name': 'family',
+            'text_re': r'(<a[^>]+>)?([А-Яа-я\s]+)?(Женат|женат).*?(?<!г)\.', # regexp for retrieving extra content 
+                                                                             # data from  paragraph text
+            'leave_also_contains_data': False, # don't touch data matched to text_re within original text,
+                                               # otherwise data will be cropped
+
+            # Examples:
+            # Депутат женат с 2013 г., имеет дочь.
+            # Женат, имеет двух сыновей.
+            # <a href=\"link">Женат, двое детей</a> (9).
+            # <a href=\"link://link.ru/abc-ssd">Женат, имеет двоих сыновей</a> (3).
         },
         'conclusion': {
             'order_id': 9,
@@ -61,7 +75,8 @@ config = {
             'order_id': 10,
             'name': 'lobby',
             'check_re': r'Группа лоббистов:?\s*',
-            'list_of_strings': True
+            'list_of_strings': True, # export as list of strings,
+                                     # otherwise content data will be exported like one string
         }
     }
 }
