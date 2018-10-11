@@ -192,6 +192,7 @@ class DOCXText(DOCXItem):
     def getText(self):
         return self._item.text
 
+
 class DOCXBr(DOCXItem):
     """Representation of <w:br> docx element"""
 

@@ -4,4 +4,4 @@ from .items import DOCXParagraph, DOCXItem, DOCXText, DOCXDrawing, DOCXHyperlink
 from .document import DOCXDocument
 
 
-__version__ = '0.1'  
+__version__ = '0.1'

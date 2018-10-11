@@ -1,5 +1,4 @@
 import argparse
-from zipfile import ZipFile
 from bs4 import BeautifulSoup, element
 from pprint import pprint, PrettyPrinter
 import abc
