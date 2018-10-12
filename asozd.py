@@ -5,7 +5,7 @@ import json
 
 from pprint import pprint, PrettyPrinter
 from DOCX.document import DOCXDocument
-from DOCX.items import DOCXItem, DOCXParagraph
+from DOCX.items import DOCXItem, DOCXParagraph, DOCXDrawing
 
 
 CONFIG_FILE_NAME = 'parser_config.json'
@@ -85,9 +85,11 @@ class ASOZDParser(DOCXDocument):
             }
         self._results = D
 
+
     def get_config(self, type, key):
         """Returns config 'key' value for specified 'type'"""
         return self.config['types'][type].get(key)
+
 
     def addResult(self, type, text, raw_text=None, replace_check_re_with=None):
         """Adds recognition result to internal storage"""
@@ -144,6 +146,7 @@ class ASOZDParser(DOCXDocument):
         else:
             self._results[type]['raw_text'].append(text_to_save.split(os.linesep))
 
+
     def addResultImage(self, type, image_name):
         self._dbg("Adding image %s for recognized %s" % (image_name, type))
         if self._results[type].get('images'):
@@ -169,7 +172,7 @@ class ASOZDParser(DOCXDocument):
                             docx_img = doc.openDocxImage(img_name)
                             shutil.copyfileobj(docx_img, fimg)
                         finally:
-                            docx_img.close()
+                            if docx_img: docx_img.close()
                 self._dbg('Image saved.')
 
 
@@ -256,6 +259,7 @@ class ASOZDParser(DOCXDocument):
     def getConfigStr(self):
         return json.dumps(self.config, indent=4, sort_keys=True)
 
+
     def addParagraph(self, p):
         self.pStorage.append({
             'id': p.getId(),
@@ -341,7 +345,8 @@ class ASOZDParser(DOCXDocument):
                         if self.get_config(extra_type, 'is_image'):
                             self._dbg('Try to find images within paragraph')
                             for img in p.getImages():
-                                drw = DOCXItem.factory(img, docx=Doc)
+                                drw = DOCXDrawing(img, docx=Doc)
+                                #drw = DOCXItem.factory(img, docx=Doc)
                                 img_name = drw.getImageName()
                                 self._dbg('Image %s found' % img_name)
                                 self.addResultImage(extra_type, img_name)

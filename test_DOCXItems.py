@@ -51,8 +51,12 @@ class DOCXDrawingTest(DOCXItemTest):
     """DOCXDrawing tests"""
     
     def setUp(self):
+        # initiates DOCXDocument
+        self.doc = DOCXDocument(self.test_file_name)
+        self.doc.load()
+
         self.d_original = self.soup_doc.find(DOCXDrawing.full_tag_name)
-        self.d = DOCXDrawing(self.d_original)
+        self.d = DOCXDrawing(self.d_original, docx=self.doc)
 
     def test_DOCXDrawing_getText_returns_None(self):
         """getText() contents for <w:drawing> return None"""
@@ -60,7 +64,8 @@ class DOCXDrawingTest(DOCXItemTest):
         
     def test_DOCXDrawing_getImageName(self):
         """getImageName() contents for <w:drawing>"""
-        self.assertEqual(self.d.getImageName(), 'image2.jpg')
+        image_name = self.d.getImageName()
+        self.assertEqual(image_name, 'media/image2.jpg')
  
 
 class DOCXRunTest(DOCXItemTest):

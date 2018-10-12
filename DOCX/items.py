@@ -73,13 +73,14 @@ class DOCXParagraph(DOCXItem):
         super(DOCXParagraph, self).__init__(item, *args, **kwargs)
         
         if self._item.name == 'p':
-            self._id = item.attrs['w14:paraId']
+            if item.attrs.get('w14:paraId'):
+                self._id = item.attrs['w14:paraId']
     
     def getImages(self):
         return self._item.findChildren(DOCXDrawing.full_tag_name, recursive=True) 
 
     def getId(self):
-        return self._id
+        return '' if self._id is None else self._id
 
     def getChildren(self):
         return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST, recursive=False)
@@ -121,11 +122,15 @@ class DOCXDrawing(DOCXItem):
         return None
     
     def getImageName(self):
-        pic_tag = self._item.find('pic:cNvPr')
-        if pic_tag:
-            return pic_tag.get('name')
-        else:
-            return None
+        embed_tag = self._item.find('pic:blipFill').find('a:blip')
+        #pic_tag = self._item.find('pic:cNvPr')
+        if embed_tag:
+            #  <a:blip r:embed="rId6"/>
+            rId = embed_tag.get('r:embed')
+            if rId and self.getDoc():
+                return self.getDoc().getRelationshipTargetById(rId)
+
+        return None
 
 
 class DOCXHyperlink(DOCXItem):
@@ -140,8 +145,13 @@ class DOCXHyperlink(DOCXItem):
     def getText(self):
         # calculate ref target
         href = None
-        if self._doc:
-            href = self._doc.RD[self.getRelationshipId()]['Target']
+        #if self._doc:
+            #href = self._doc.RD[]['Target']
+            #href = self._doc.getRelationshipTargetById(self.getRelationshipId())
+
+        if self.getDoc():
+            #href = self._doc.RD[]['Target']
+            href = self.getDoc().getRelationshipTargetById(self.getRelationshipId())
 
         text = DOCXRun(self._item.find(DOCXRun.full_tag_name)).getText()
         return '<a href="%s">%s</a>' % (href, text)

@@ -11,3 +11,8 @@ You need Python 3.7 or later to run dcl-asozd-parser.
 Used packages:
 * beautifulsoup4
 * lxml
+
+
+Testing
+------------
+

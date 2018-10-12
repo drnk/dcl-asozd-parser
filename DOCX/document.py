@@ -5,7 +5,7 @@ from .items import DOCXParagraph
 
 DOCX_CONTENTS_FILE_NAME = 'word/document.xml'
 DOCX_RELS_FILE_NAME = 'word/_rels/document.xml.rels'
-DOCX_IMG_DIR_NAME = 'word/media'
+DOCX_IMG_DIR_NAME = 'word'
 
 class DOCXDocument(object):
     """Definition and common routines for docx document"""
@@ -61,6 +61,12 @@ class DOCXDocument(object):
         """Return raw Document data from docx file"""
         return self._doc.read()
 
+    def getRelationshipTargetById(self, rId):
+        """Returns target value for the reference from docx"""
+        if self.RD.get(rId):
+            return self.RD[rId]['Target']
+        else:
+            return None
 
     def getRelationshipsRawData(self):
         """Return raw Relationships data from docx file"""
