@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 from zipfile import ZipFile
 
 from .items import DOCXParagraph
+from pprint import pprint
 
 DOCX_CONTENTS_FILE_NAME = 'word/document.xml'
 DOCX_RELS_FILE_NAME = 'word/_rels/document.xml.rels'
@@ -12,8 +13,11 @@ class DOCXDocument(object):
 
     RD = {}
 
-    _DEBUG = True
+    _DEBUG = False
+    _VERSION = None
+
     _is_already_opened = False
+    _version_check_complete = False
 
     def __init__(self, file_name, *args, **kwargs):
         self.file_name = file_name
@@ -22,6 +26,10 @@ class DOCXDocument(object):
             self._DEBUG = kwargs['debug']
 
         self._openDocx()
+
+    def _dbg(self, msg):
+        if self._DEBUG:
+            pprint(msg)
 
 
     def __enter__(self):
@@ -33,6 +41,28 @@ class DOCXDocument(object):
         self._rels.close()
         self._doc.close()
         self._zipfile.close()
+
+    def getMSWordVersion(self):
+        res_version = None
+
+        if self._version_check_complete:
+            res_version = self._VERSION
+        else:
+            #12.0000 = Word 2007
+            #14.0000 = Word 2010
+            #15.0000 = Word 2013
+            #16.0000 = Word 2016
+
+            app_file_name = 'docProps/app.xml'
+            try:
+                soup = BeautifulSoup(self._zipfile.open(app_file_name, 'r').read(), 'lxml-xml')
+                res_version = soup.find('AppVersion').text
+            except FileNotFoundError:
+                self._dbg('Couln\'t determine Microsoft Word version from %s' % app_file_name)
+            except KeyError:
+                self._dbg('Something went wrong during determinig Microsoft Word version from %s' % app_file_name)
+
+        return res_version
 
     def getZipFile(self):
         return self._zipfile

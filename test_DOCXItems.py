@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 from DOCX.items import DOCXText, DOCXBr, DOCXRun, DOCXHyperlink, DOCXDrawing, DOCXParagraph
 from DOCX.document import DOCXDocument
 
-
 class DOCXItemTest(unittest.TestCase):
     """DOCXText tests"""
     

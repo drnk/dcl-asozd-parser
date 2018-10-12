@@ -4,6 +4,7 @@ import os
 
 from bs4 import element
 
+LINESEP = os.linesep
 
 CLEANING_REGEXP = re.compile('<[^>]+>')
 
@@ -13,7 +14,7 @@ class DOCXItem(object):
     
     _doc = None # reference to Document
 
-    EXCLUDE_LIST = ('pPr', 'rPr')
+    EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr'] # exclusion list for retrieving children elements
 
     def __init__(self, item, *args, **kwargs):
         #dbg('DOCXItem.__init__:', type(item), isinstance(item, element.Tag))
@@ -24,7 +25,11 @@ class DOCXItem(object):
 
     def getDoc(self):
         return self._doc
-    
+
+    @property
+    def name(self):
+        return self._item.name
+
     @staticmethod
     def factory(item, *args, **kwargs):
         if isinstance(item, element.Tag):
@@ -85,7 +90,18 @@ class DOCXParagraph(DOCXItem):
     def getChildren(self):
         return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST, recursive=False)
 
+    def _getRawText(self):
+        t = [y.getText()
+             for y in [DOCXItem.factory(x, docx=self.getDoc())
+                       for x in self.getChildren()]
+             if y
+            ]
+        return ''.join(t).split(LINESEP)
+
     def getText(self):
+        return ''.join(self._getRawText())
+
+    def getTextOLD(self):
         #print('Pargraph(%s).getText() start' % self.getId())
         res = ''
         #print('Paragraph children: %s' % self.getChildren())
@@ -98,8 +114,10 @@ class DOCXParagraph(DOCXItem):
                     res = res + txt
         #print('Pargraph(%s).getText() stop' % self.getId())
         return res
-
     def getRawText(self):
+        return self._getRawText()
+    
+    def getRawTextOLD(self):
         res = []
         for item in self.getChildren():
             el = DOCXItem.factory(item, docx=self.getDoc())
@@ -210,4 +228,4 @@ class DOCXBr(DOCXItem):
     tag_name = 'br'
 
     def getText(self):
-        return os.linesep
+        return LINESEP

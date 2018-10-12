@@ -105,7 +105,9 @@ class ASOZDParser(DOCXDocument):
         #    pp.pformat(replace_check_re_with)
         #))
 
-        text_to_save = text.strip()
+        #text_to_save = text.strip()
+        text_to_save = text
+        
         #raw_text_to_save = [x[0] for x in raw_text]
         raw_text_to_save = raw_text.copy()
 
@@ -278,6 +280,7 @@ class ASOZDParser(DOCXDocument):
 
     def getParagraphsRefs(self):
         return [p['ref'] for p in self.pStorage]
+
 
     def recognizeParagraph(self, p):
         #dbg('Paragraph text (%s): %s' % (p._item.tag, p.getCleanedText()))
