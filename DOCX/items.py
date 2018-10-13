@@ -13,8 +13,9 @@ class DOCXItem(object):
     __metaclass__ = abc.ABCMeta
     
     _doc = None # reference to Document
+    _DEBUG = True
 
-    EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr'] # exclusion list for retrieving children elements
+    EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr', 'bookmarkStart'] # exclusion list for retrieving children elements
 
     def __init__(self, item, *args, **kwargs):
         #dbg('DOCXItem.__init__:', type(item), isinstance(item, element.Tag))
@@ -22,6 +23,9 @@ class DOCXItem(object):
             self._item = item
             if kwargs.get('docx'):
                 self._doc = kwargs['docx']
+        
+        if kwargs.get('debug'):
+            self._DEBUG = (kwargs.get('debug') == True)
 
     def getDoc(self):
         return self._doc
@@ -47,19 +51,41 @@ class DOCXItem(object):
                 return DOCXText(item, *args, **kwargs)
 
         return None
+
+    def is_debug(self):
+        return self._DEBUG == True
     
     @abc.abstractmethod
-    def getChildren(self):
-        """Returns children elements"""
-        pass
+    def _getRawText(self):
+        """Returns unprocessed text from element"""
+        #if self.is_debug(): print(">>> Call <%s>.getRawText()" % self.name)
+        
+        t = []
+        for child in self.getChildren():
+
+            docx_child = DOCXItem.factory(child, docx=self.getDoc(), debug=self.is_debug())
+            if docx_child:
+                t = t + docx_child._getRawText()
+        return t
     
     @abc.abstractmethod
     def getText(self):
         """Returns text representation of the element"""
-        pass
+        #print(self._getRawText())
+        return ''.join(self._getRawText())
+
+    @abc.abstractmethod
+    def getRawText(self):
+        """Returns text representation in the list where each element represent a string"""
+        return self._getRawText()
+
+    def getChildren(self):
+        return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST, recursive=False)
+
 
     def __str__(self):
         return self.getText()
+
 
     def getCleanedText(self):
         return CLEANING_REGEXP.sub('', self.getText())
@@ -87,46 +113,6 @@ class DOCXParagraph(DOCXItem):
     def getId(self):
         return '' if self._id is None else self._id
 
-    def getChildren(self):
-        return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST, recursive=False)
-
-    def _getRawText(self):
-        t = [y.getText()
-             for y in [DOCXItem.factory(x, docx=self.getDoc())
-                       for x in self.getChildren()]
-             if y
-            ]
-        return ''.join(t).split(LINESEP)
-
-    def getText(self):
-        return ''.join(self._getRawText())
-
-    def getTextOLD(self):
-        #print('Pargraph(%s).getText() start' % self.getId())
-        res = ''
-        #print('Paragraph children: %s' % self.getChildren())
-        for item in self.getChildren():
-            el = DOCXItem.factory(item, docx=self.getDoc())
-            #print('Working on children %s' % el.tag_name)
-            if el:
-                txt = el.getText()
-                if txt:
-                    res = res + txt
-        #print('Pargraph(%s).getText() stop' % self.getId())
-        return res
-    def getRawText(self):
-        return self._getRawText()
-    
-    def getRawTextOLD(self):
-        res = []
-        for item in self.getChildren():
-            el = DOCXItem.factory(item, docx=self.getDoc())
-            if el:
-                txt = el.getText()
-                if txt:
-                    res.append(txt)
-        return res
-
     def __repr__(self):
         return self._item.__repr__()
 
@@ -138,6 +124,7 @@ class DOCXDrawing(DOCXItem):
 
     def getText(self):
         return None
+        #return ''
     
     def getImageName(self):
         embed_tag = self._item.find('pic:blipFill').find('a:blip')
@@ -160,19 +147,13 @@ class DOCXHyperlink(DOCXItem):
     def getRelationshipId(self):
         return self._item.get('r:id')
 
-    def getText(self):
-        # calculate ref target
+    def _getRawText(self):
         href = None
-        #if self._doc:
-            #href = self._doc.RD[]['Target']
-            #href = self._doc.getRelationshipTargetById(self.getRelationshipId())
-
         if self.getDoc():
-            #href = self._doc.RD[]['Target']
             href = self.getDoc().getRelationshipTargetById(self.getRelationshipId())
 
         text = DOCXRun(self._item.find(DOCXRun.full_tag_name)).getText()
-        return '<a href="%s">%s</a>' % (href, text)
+        return ['<a href="%s">%s</a>' % (href, text)]
 
     def getCleanedText(self):
         return self._item.get_text()
@@ -194,15 +175,14 @@ class DOCXRun(DOCXItem):
     full_tag_name = 'w:r'
     tag_name = 'r'
 
-    def getText(self):
-        res = ''
-        for item in self._item.findChildren(
-                        [DOCXText.full_tag_name, DOCXBr.full_tag_name],
-                        recursive=False):
-            
+    def _getRawText(self):
+        res = []
+
+        tag_target_list = [DOCXText.full_tag_name, DOCXBr.full_tag_name]
+        for item in self._item.findChildren(tag_target_list, recursive=False):
             el = DOCXItem.factory(item, docx=self.getDoc())
             if el:
-                txt = el.getText()
+                txt = el._getRawText()
                 if txt:
                     res = res + txt
         return res
@@ -217,8 +197,8 @@ class DOCXText(DOCXItem):
     full_tag_name = 'w:t'
     tag_name = 't'
 
-    def getText(self):
-        return self._item.text
+    def _getRawText(self):
+        return [self._item.text]
 
 
 class DOCXBr(DOCXItem):
@@ -227,5 +207,5 @@ class DOCXBr(DOCXItem):
     full_tag_name = 'w:br'
     tag_name = 'br'
 
-    def getText(self):
-        return LINESEP
+    def _getRawText(self):
+        return [LINESEP]

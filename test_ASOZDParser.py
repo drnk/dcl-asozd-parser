@@ -10,6 +10,9 @@ DEST_DIR = 'test\\results'
 DEST_FNAME1 = 'test_asozd_source_n1'
 DEST_FNAME2 = 'test_asozd_source_n2'
 
+#assert_equal.__self__.maxDiff = None
+
+
 class ASOZDParserResultsTest1(unittest.TestCase):
     """ASOZDParser tests"""
     
@@ -104,7 +107,8 @@ class ASOZDParserResultsTest1(unittest.TestCase):
             'Александра Карлина (координировал деятельность органов исполнительной власти края '+\
             'в сфере социальной политики). С мая 2011 г. возглавлял Территориальный фонд обязательного '+\
             'медицинского страхования края (по должности). Президент федерации дзюдо Алтайского края. '+\
-            '\r\nС 2016 года - депутат Государственной Думы седьмого созыва.'
+            '\r\nС 2016 года - депутат Государственной Думы седьмого созыва. '
+
         self.assertEqual(self.data['bio'], tgt)
 
     def test_json_fraction_is_full(self):
@@ -254,7 +258,8 @@ class ASOZDParserResultsTest2(unittest.TestCase):
             'Александра Карлина (координировал деятельность органов исполнительной власти края '+\
             'в сфере социальной политики). С мая 2011 г. возглавлял Территориальный фонд обязательного '+\
             'медицинского страхования края (по должности). Президент федерации дзюдо Алтайского края. '+\
-            '\r\nС 2016 года - депутат Государственной Думы седьмого созыва.'
+            '\r\nС 2016 года - депутат Государственной Думы седьмого созыва. '
+        
         self.assertEqual(self.data['bio'], tgt)
 
     def test_json_fraction_is_full(self):
@@ -266,6 +271,7 @@ class ASOZDParserResultsTest2(unittest.TestCase):
             'structure/factions/er/\">Единая Россия</a>”, ч<a href=\"http://old.duma.gov.'+\
             'ru/structure/committees/1760707/\">лен Комитета ГД </a>по государственному '+\
             'строительству и законодательству'
+        self.maxDiff = None
         self.assertEqual(self.data['fraction'], tgt)
     
     def test_json_conclusion_is_full(self):
@@ -286,4 +292,5 @@ class ASOZDParserResultsTest2(unittest.TestCase):
             '<a href=\"https://lenta.ru/articles/2018/10/12/football/\">изначально говорили</a>, '+\
             'что слушания назначены на пятницу. К суду примчались журналисты всех ведущих СМИ, но '+\
             'футболисты не спешили их радовать — и Чук, и Гек оказались неразговорчивы.'
+        self.maxDiff = None
         self.assertEqual(self.data['conclusion'], tgt)

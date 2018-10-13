@@ -168,13 +168,14 @@ class DOCXParagraphTest(DOCXItemTest):
 
     def test_DOCXParagraph_getRawText(self):
         """<w:p> getRawText() returns list with <w:r> contents"""
-        #tgt = ['Депутат Государственной Думы VII созыва, избран от избирательного '+\
-        #    'округа 0039 (Барнаульский ', '-', ' Алтайский край)']
+        tgt = ['Депутат Государственной Думы VII созыва, избран от избирательного округа 0039 (Барнаульский ', 
+               '-', 
+               ' Алтайский край)']
 
-        tgt = []
-        for r in self.p._item.findChildren('r', recursive=False):
-            t = r.getText()
-            if t: tgt.append(t)
+        #tgt = []
+        #for r in self.p._item.findChildren('r', recursive=False):
+        #    t = r.getText()
+        #    if t: tgt.append(t)
 
         self.assertEqual(self.p.getRawText(), tgt)
 

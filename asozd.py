@@ -39,8 +39,12 @@ class ASOZDParser(DOCXDocument):
 
     def __init__(self, file_name, *args, **kwargs):
         
-        if kwargs.get('debug_mode'):
-            self._DEBUG = (kwargs.get('debug_mode') == True)
+        if kwargs.get('debug'):
+            self._DEBUG = (kwargs.get('debug') == True)
+
+        self._line_separator = os.linesep
+        if kwargs.get('linesep'):
+            self._line_separator = kwargs.get('linesep')
         
         # file name for docx document
         self.file_name = file_name
@@ -56,6 +60,12 @@ class ASOZDParser(DOCXDocument):
 
         self._doc = DOCXDocument(self.file_name)
 
+    def is_debug(self):
+        return (self._DEBUG == True)
+
+    @property
+    def linesep(self):
+        return self._line_separator
 
 
     def getDoc(self):
@@ -96,57 +106,30 @@ class ASOZDParser(DOCXDocument):
 
         replacement = replace_check_re_with
         config_dont_replace = self.get_config(type, 'do_not_replace_check_re')
-        
-        #pp = PrettyPrinter()
-        #print('addResult(type=%s, text=%s, raw_text=%s, replace_check_re_with=%s)' % (
-        #    type,
-        #    pp.pformat(text),
-        #    pp.pformat(raw_text),
-        #    pp.pformat(replace_check_re_with)
-        #))
 
-        #text_to_save = text.strip()
         text_to_save = text
         
         #raw_text_to_save = [x[0] for x in raw_text]
-        raw_text_to_save = raw_text.copy()
-
-        #self._dbg('>>> replacement: %s; config_dont_replace: %s' % (replacement, config_dont_replace))
+        if raw_text:
+            raw_text_to_save = raw_text.copy()
+        else:
+            raw_text_to_save = text_to_save.split(self.linesep)
 
         if not(replacement is None) and not config_dont_replace:
             # replace find pattern string in plain text
-            text_to_save = re.sub(self.config['types'][type]['check_re'], replacement, text_to_save)
+            text_to_save = re.sub(self.get_config(type, 'check_re'), replacement, text_to_save)
 
             # replace find pattern string in raw text list
             if raw_text_to_save:
-                if re.sub(self.config['types'][type]['check_re'], replacement, raw_text_to_save[0]) == '':
+                if re.sub(self.get_config(type, 'check_re'), replacement, raw_text_to_save[0]) == '':
                     self._dbg('Raw-text-to-save element removed %s' % raw_text_to_save[0])
-                    raw_text_to_save.remove(raw_text_to_save[0])
+                    raw_text_to_save.pop(0)
         
         # adding plain text to internal storage
-        if self._results[type]['text']:
-            self._results[type]['text'] = self._results[type]['text'] + text_to_save
-        else:
-            self._results[type]['text'] = text_to_save
-        
-        # adding raw text list to internal storage
-        if type == 'lobby':
-            self._dbg('raw_text = %s' % raw_text)
-            self._dbg('raw_text_to_save = %s' % raw_text_to_save)
-        if raw_text:
-            if raw_text_to_save:
-                # it is possible that raw_text contain a string with line separators (come from w:br)
-                # here we split this kind of text
-                tmp = []
-                for y in [x.split(os.linesep) for x in raw_text_to_save]:
-                    if type == 'lobby':
-                        self._dbg('Iterating [%s]' % y)
-                    if y != "":
-                        tmp = tmp + y
-                
-                self._results[type]['raw_text'] = self._results[type]['raw_text'] + [x for x in tmp if x != ""]
-        else:
-            self._results[type]['raw_text'].append(text_to_save.split(os.linesep))
+        self._results[type]['text'] =\
+            (self._results[type]['text'] if self._results[type]['text'] else '') + text_to_save
+        self._results[type]['raw_text'] =\
+            (self._results[type]['raw_text'] if self._results[type]['raw_text'] else []) + raw_text_to_save
 
 
     def addResultImage(self, type, image_name):
@@ -275,11 +258,11 @@ class ASOZDParser(DOCXDocument):
         else:
             return [p['ref'].getText() for p in self.pStorage]
 
-    def getParagraphsId(self):
-        return [p['id'] for p in self.pStorage]
-
-    def getParagraphsRefs(self):
-        return [p['ref'] for p in self.pStorage]
+    #def getParagraphsId(self):
+    #    return [p['id'] for p in self.pStorage]
+#
+    #def getParagraphsRefs(self):
+    #    return [p['ref'] for p in self.pStorage]
 
 
     def recognizeParagraph(self, p):
@@ -322,7 +305,7 @@ class ASOZDParser(DOCXDocument):
             # dbg - stop
 
             p = DOCXParagraph(praw, docx=Doc)
-            self.addParagraph(p)
+            #self.addParagraph(p)
             self._dbg('----> (%02d) Paragraph '%pi + p.getId())
             
             if p.getCleanedText().strip() == '':
@@ -333,8 +316,14 @@ class ASOZDParser(DOCXDocument):
 
             if p_type or last_recognized_type:
 
-                par_text = p.getText()
-                par_raw_text = p.getRawText()
+                # forming paragraph text as joining raw data without any join chars
+                par_text = ''.join(p.getRawText())
+
+                # to avoid fragmented values within raw value we split text into strings
+                # it is usefull for lobby parsing, because every word in docx could be
+                # separated to own element and it is difficult to strip 'check_re' matches
+                # from the list where evary word is element
+                raw_text = par_text.split(self.linesep)
 
                 work_type = p_type if p_type else last_recognized_type
 
@@ -343,39 +332,38 @@ class ASOZDParser(DOCXDocument):
                 if extra_types_list:
 
                     self._dbg('Found %d extra types: %s' % (len(extra_types_list), extra_types_list))
-                    
                     for extra_type in extra_types_list:
                         if self.get_config(extra_type, 'is_image'):
                             self._dbg('Try to find images within paragraph')
                             for img in p.getImages():
-                                drw = DOCXDrawing(img, docx=Doc)
-                                #drw = DOCXItem.factory(img, docx=Doc)
+                                drw = DOCXDrawing(img, docx=Doc, debug=self.is_debug())
                                 img_name = drw.getImageName()
                                 self._dbg('Image %s found' % img_name)
+
+                                # adding image to result
                                 self.addResultImage(extra_type, img_name)
 
                         elif self.get_config(extra_type, 'text_re'):
-                            self._dbg('Found text_re for %s' % extra_type)
+                            self._dbg("Found 'text_re' for %s" % extra_type)
                             self._dbg('Searching [%s] in [%s]' % (self.get_config(extra_type, 'text_re'), par_text))
                             m = re.search(self.get_config(extra_type, 'text_re'), par_text)
                             if m:
                                 search_res = m.group(0).strip()
-                                self.addResult(extra_type, search_res, [search_res])
+                                self.addResult(extra_type, search_res)
                                 if not self.get_config(extra_type, 'leave_also_contains_data'):
                                     par_text = par_text.replace(search_res, '')
-                                
+                
                 if p_type:
-                    # start of docx part which could be related to 
-                    # one of the target data parts
                     self._dbg('Paragraph recognized as [%s]' % p_type)
-
                     last_recognized_type = p_type
                     
-                    # save main recognition result
-                    self.addResult(p_type, par_text, par_raw_text, replace_check_re_with='')
+                    # save result
+                    #self.addResult(p_type, par_text, par_raw_text, replace_check_re_with='')
+                    self.addResult(p_type, par_text, replace_check_re_with='')
                 elif last_recognized_type:
                     self._dbg('Paragraph hasn''t recognized. Add data to the last recognized as [%s]' % last_recognized_type)
-                    self.addResult(last_recognized_type, par_text, par_raw_text)
+                    #self.addResult(last_recognized_type, self.linesep + par_text, [self.linesep] + par_raw_text)
+                    self.addResult(last_recognized_type, self.linesep + par_text)
             else:
                 self._dbg('Warning! Paragraph iter %d was skipped.' % pi)
             
