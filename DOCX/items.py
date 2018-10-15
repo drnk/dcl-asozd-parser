@@ -1,3 +1,12 @@
+"""
+Module contains classes definition for DOCX elements:
+  * paragraph (DOCXParagraph)
+  * hyperlink (DOCXHyperlink)
+  * text (DOCXText)
+  * run (DOCXRun)
+  * drawings (DOCXDrawing)
+  * br (DOCXBr)
+"""
 import abc
 import re
 import os
@@ -10,34 +19,39 @@ CLEANING_REGEXP = re.compile('<[^>]+>')
 
 
 class DOCXItem(object):
+    """Common class for docx elements"""
     __metaclass__ = abc.ABCMeta
-    
+
     _doc = None # reference to Document
-    _DEBUG = True
+    _debug = True
 
-    EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr', 'bookmarkStart'] # exclusion list for retrieving children elements
+    # exclusion list for retrieving children elements
+    EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr', 'bookmarkStart']
 
-    def __init__(self, item, *args, **kwargs):
+    def __init__(self, item, **kwargs):
         #dbg('DOCXItem.__init__:', type(item), isinstance(item, element.Tag))
         if isinstance(item, element.Tag):
             self._item = item
             if kwargs.get('docx'):
                 self._doc = kwargs['docx']
-        
+
         if kwargs.get('debug'):
-            self._DEBUG = (kwargs.get('debug') == True)
+            self._debug = kwargs.get('debug') is True
 
     def getDoc(self):
+        """Returns reference to DOCXDocument instance"""
         return self._doc
 
     @property
     def name(self):
+        """Returns name of the element"""
         return self._item.name
 
     @staticmethod
     def factory(item, *args, **kwargs):
+        """Factory for create DOCX element instances."""
         if isinstance(item, element.Tag):
-            if item.name == "p": 
+            if item.name == "p":
                 return DOCXParagraph(item, *args, **kwargs)
             if item.name == "r":
                 return DOCXRun(item, *args, **kwargs)
@@ -53,21 +67,22 @@ class DOCXItem(object):
         return None
 
     def is_debug(self):
-        return self._DEBUG == True
-    
+        """Returns True is debug mode is on, otherwise returns False"""
+        return self._debug is True
+
     @abc.abstractmethod
     def _getRawText(self):
         """Returns unprocessed text from element"""
         #if self.is_debug(): print(">>> Call <%s>.getRawText()" % self.name)
-        
-        t = []
+
+        res = []
         for child in self.getChildren():
 
             docx_child = DOCXItem.factory(child, docx=self.getDoc(), debug=self.is_debug())
             if docx_child:
-                t = t + docx_child._getRawText()
-        return t
-    
+                res = res + docx_child.getRawText()
+        return res
+
     @abc.abstractmethod
     def getText(self):
         """Returns text representation of the element"""
@@ -80,21 +95,21 @@ class DOCXItem(object):
         return self._getRawText()
 
     def getChildren(self):
-        return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST, recursive=False)
-
+        """Returns direct children elements"""
+        return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST,
+                                       recursive=False)
 
     def __str__(self):
         return self.getText()
 
-
     def getCleanedText(self):
+        """Return text element value cleaned from the element (<el>text</el> -> text)"""
         return CLEANING_REGEXP.sub('', self.getText())
-        #return self._item.get_text()
 
 
 class DOCXParagraph(DOCXItem):
     """Paragraph definition for docs document"""
-    
+
     full_tag_name = 'w:p'
     tag_name = 'p'
 
@@ -102,13 +117,13 @@ class DOCXParagraph(DOCXItem):
 
     def __init__(self, item, *args, **kwargs):
         super(DOCXParagraph, self).__init__(item, *args, **kwargs)
-        
+
         if self._item.name == 'p':
             if item.attrs.get('w14:paraId'):
                 self._id = item.attrs['w14:paraId']
-    
+
     def getImages(self):
-        return self._item.findChildren(DOCXDrawing.full_tag_name, recursive=True) 
+        return self._item.findChildren(DOCXDrawing.full_tag_name, recursive=True)
 
     def getId(self):
         return '' if self._id is None else self._id
@@ -124,9 +139,11 @@ class DOCXDrawing(DOCXItem):
 
     def getText(self):
         return None
-        #return ''
-    
+
     def getImageName(self):
+        """Returns image name from <w:drawing>/../<a:blip r:embed="referenceId">
+        referenceId will be replaced with target reference from relationships docx file.
+        """
         embed_tag = self._item.find('pic:blipFill').find('a:blip')
         #pic_tag = self._item.find('pic:cNvPr')
         if embed_tag:
@@ -145,6 +162,7 @@ class DOCXHyperlink(DOCXItem):
     tag_name = 'hyperlink'
 
     def getRelationshipId(self):
+        """Returns relationship identifier"""
         return self._item.get('r:id')
 
     def _getRawText(self):
@@ -171,7 +189,7 @@ class DOCXRun(DOCXItem):
 
     Current versions supports only <w:t> and <w:br> elements
     """
-    
+
     full_tag_name = 'w:r'
     tag_name = 'r'
 
@@ -182,7 +200,7 @@ class DOCXRun(DOCXItem):
         for item in self._item.findChildren(tag_target_list, recursive=False):
             el = DOCXItem.factory(item, docx=self.getDoc())
             if el:
-                txt = el._getRawText()
+                txt = el.getRawText()
                 if txt:
                     res = res + txt
         return res
