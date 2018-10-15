@@ -1,11 +1,17 @@
-import io, shutil, os
+"""
+Definition of ASOZDParser class.
+Provides parser logic for docx files.
+"""
+import io
+import shutil
+import os
 import operator
 import re
 import json
 
-from pprint import pprint, PrettyPrinter
+from pprint import pprint
 from DOCX.document import DOCXDocument
-from DOCX.items import DOCXItem, DOCXParagraph, DOCXDrawing
+from DOCX.items import DOCXParagraph, DOCXDrawing
 
 
 CONFIG_FILE_NAME = 'parser_config.json'
@@ -19,33 +25,24 @@ DEBUG = True
 
 
 class ASOZDParser(DOCXDocument):
+    """Class for retreiving data from formed docx documents"""
 
-    #ФИО
-    #Фото нужно сохранить отдельным файлом (рядом с json, например)
-    #Должность/позиция - текст
-    #Фракция, членство в комитетах - текст
-    #Биография - текст с ссылками внутри
-    #Внесенные законопроекты - текст с внешними гиперссылками
-    #Аффиляция, связи - текст с внешними гиперссылками (Доноры депутата в 2016 году идут сюда)
-    #семейное положение - текст 
-    #Выводы - текст с внешними гиперссылками
-    #Группа лоббистов - массив строк
-
-    _DEBUG = False
+    _debug = False
 
     def _dbg(self, msg):
-        if self._DEBUG:
+        if self._debug:
             pprint(msg)
 
     def __init__(self, file_name, *args, **kwargs):
-        
-        if kwargs.get('debug'):
-            self._DEBUG = (kwargs.get('debug') == True)
+        super(ASOZDParser, self).__init__(file_name, *args, **kwargs)
+
+        #if kwargs.get('debug'):
+        #    self._debug = (kwargs.get('debug') == True)
 
         self._line_separator = os.linesep
         if kwargs.get('linesep'):
             self._line_separator = kwargs.get('linesep')
-        
+
         # file name for docx document
         self.file_name = file_name
 
@@ -54,61 +51,69 @@ class ASOZDParser(DOCXDocument):
         self.config = config
 
         # list for storing paragraph data
-        self.pStorage = []
+        #self.pStorage = []
 
         self._init_config()
 
         self._doc = DOCXDocument(self.file_name)
 
     def is_debug(self):
-        return (self._DEBUG == True)
+        """Returns True is debug mode is switched on, otherwise returns false"""
+        return self._debug is True
 
     @property
     def linesep(self):
+        """Operation system specific line separator value"""
         return self._line_separator
 
 
-    def getDoc(self):
+    def get_doc(self):
+        """Returns reference to Document"""
         return self._doc
 
 
     def _init_config(self):
-        D = {}
-        for z in self.config['types'].items():
-            if z[1].get('check_re'): D[z[1]['check_re']] = z[0]
-        self._re_list = D
+        dct = {}
+        for item in self.config['types'].items():
+            if item[1].get('check_re'):
+                dct[item[1]['check_re']] = item[0]
+        self._re_list = dct
         #self._dbg('RE list created:')
         #pprint(self._re_list)
 
-        D = {}
-        for z in self.config['types'].items():
-            if z[1].get('check_re'): D[z[1]['order_id']] = z[0]
-        self._config_ordered = [self.config['types'][x[1]] for x in sorted(D.items(), key=operator.itemgetter(0))]
+        dct = {}
+        for item in self.config['types'].items():
+            if item[1].get('check_re'):
+                dct[item[1]['order_id']] = item[0]
+        self._config_ordered = \
+            [self.config['types'][x[1]] for x in sorted(dct.items(), key=operator.itemgetter(0))]
         #self._dbg('Ordered config created:')
         #pprint(self._config_ordered)
 
-        D = {}
-        for z in self.config['types'].items():
-            D[z[0]] = {
-                'text': None,
-                'raw_text': []
-            }
-        self._results = D
+        #dct = {}
+        #for item in self.config['types'].items():
+        #    dct[item[0]] = {
+        #        'text': None,
+        #        'raw_text': []
+        #    }
+        #self._results = dct
+        self._results = {item[0]: {'text': None, 'raw_text': []}\
+            for item in self.config['types'].items()}
 
 
-    def get_config(self, type, key):
+    def get_config(self, res_type, key):
         """Returns config 'key' value for specified 'type'"""
-        return self.config['types'][type].get(key)
+        return self.config['types'][res_type].get(key)
 
 
-    def addResult(self, type, text, raw_text=None, replace_check_re_with=None):
+    def add_result(self, res_type, text, raw_text=None, replace_check_re_with=None):
         """Adds recognition result to internal storage"""
 
         replacement = replace_check_re_with
-        config_dont_replace = self.get_config(type, 'do_not_replace_check_re')
+        config_dont_replace = self.get_config(res_type, 'do_not_replace_check_re')
 
         text_to_save = text
-        
+
         #raw_text_to_save = [x[0] for x in raw_text]
         if raw_text:
             raw_text_to_save = raw_text.copy()
@@ -117,58 +122,68 @@ class ASOZDParser(DOCXDocument):
 
         if not(replacement is None) and not config_dont_replace:
             # replace find pattern string in plain text
-            text_to_save = re.sub(self.get_config(type, 'check_re'), replacement, text_to_save)
+            text_to_save = re.sub(self.get_config(res_type, 'check_re'), replacement, text_to_save)
 
             # replace find pattern string in raw text list
             if raw_text_to_save:
-                if re.sub(self.get_config(type, 'check_re'), replacement, raw_text_to_save[0]) == '':
+                if re.sub(self.get_config(res_type, 'check_re'),
+                          replacement,
+                          raw_text_to_save[0]
+                         ) == '':
                     self._dbg('Raw-text-to-save element removed %s' % raw_text_to_save[0])
                     raw_text_to_save.pop(0)
-        
+
         # adding plain text to internal storage
-        self._results[type]['text'] =\
-            (self._results[type]['text'] if self._results[type]['text'] else '') + text_to_save
-        self._results[type]['raw_text'] =\
-            (self._results[type]['raw_text'] if self._results[type]['raw_text'] else []) + raw_text_to_save
+        self._results[res_type]['text'] =\
+            (self._results[res_type]['text'] if self._results[res_type]['text'] else '') \
+            + text_to_save
+        self._results[res_type]['raw_text'] =\
+            (self._results[res_type]['raw_text'] if self._results[res_type]['raw_text'] else []) \
+            + raw_text_to_save
 
 
-    def addResultImage(self, type, image_name):
-        self._dbg("Adding image %s for recognized %s" % (image_name, type))
-        if self._results[type].get('images'):
-            self._results[type]['images'].append(image_name)
+    def add_result_image(self, res_type, image_name):
+        """Adding image data to specific result domain"""
+        self._dbg("Adding image %s for recognized %s" % (image_name, res_type))
+        if self._results[res_type].get('images'):
+            self._results[res_type]['images'].append(image_name)
         else:
-            self._results[type]['images'] = [image_name]
-    
+            self._results[res_type]['images'] = [image_name]
 
-    def getFIO(self):
+
+    def get_fio(self):
+        """Returns 'fio' text value for the instance"""
         return self._results['fio']['text'].strip()
 
 
-    def saveResultImages(self, results_dir=None):
+    def save_result_images(self, results_dir=None):
+        """Copying images from docx zip structure to the destination folder"""
         if self._results['photo'].get('images'):
             for img_name in self._results['photo']['images']:
                 self._dbg('Trying to save image: %s' % img_name)
 
-                filename = self.genAbsFnameForResultImage(img_name, results_dir)
+                filename = self.gen_abs_fname_for_result_image(img_name, results_dir)
                 if filename:
                     with open(filename, 'wb') as fimg:
                         try:
-                            doc = self.getDoc()
-                            docx_img = doc.openDocxImage(img_name)
+                            doc = self.get_doc()
+                            docx_img = doc.open_docx_image(img_name)
                             shutil.copyfileobj(docx_img, fimg)
                         finally:
-                            if docx_img: docx_img.close()
+                            if docx_img:
+                                docx_img.close()
                 self._dbg('Image saved.')
 
 
-    def genFnameForResultJson(self, results_dir=None, results_file_name=None):
+    def gen_fname_for_result_json(self, results_dir=None, results_file_name=None):
+        """Returns filename for docx parsing results (adding json as the extenstion)"""
         if results_file_name:
             if results_file_name.endswith('.json'):
                 filename = results_file_name.replace('.json', '')
             else:
                 filename = results_file_name
         else:
-            filename = self.getFIO()
+            filename = self.get_fio()
 
         if results_dir:
             out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
@@ -179,84 +194,93 @@ class ASOZDParser(DOCXDocument):
         return '%s\\%s.%s' % (out_dir, filename, fileext)
 
 
-    def genAbsFnameForResultImage(self, original_image_name, results_dir=None):
-        filepath = self.genFnameForResultImage(original_image_name)
+    def gen_abs_fname_for_result_image(self, original_image_name, results_dir=None):
+        """Returns absolute file destination path for image"""
+        filepath = self.gen_fname_for_result_image(original_image_name)
 
         if results_dir:
             out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
         else:
             out_dir = '%s\\' % BASE_DIR
 
-        if filepath:
-            return '%s%s' % (out_dir, filepath)
-        else:
-            return None
+        #if filepath:
+        #    return '%s%s' % (out_dir, filepath)
+        #else:
+        #    return None
+        return '%s%s' % (out_dir, filepath) if filepath else None
 
 
-    def genFnameForResultImage(self, original_image_name):
-        filename = self.getFIO()
-        m = re.search(r'\.(.+)$', original_image_name)
-        if m:
-            fileext = m.groups(1)[0]
+    def gen_fname_for_result_image(self, original_image_name):
+        """Returns destination file name for image"""
+        filename = self.get_fio()
+        match_res = re.search(r'\.(.+)$', original_image_name)
+        if match_res:
+            fileext = match_res.groups(1)[0]
             #self._dbg('Image name extenstion: %s' % fileext)
             if fileext:
-                return '%s\\%s.%s' % (IMAGES_OUT_DIR, filename, fileext) 
+                return '%s\\%s.%s' % (IMAGES_OUT_DIR, filename, fileext)
         return None
 
 
-    def getResultsForSave(self):
+    def get_results_for_save(self):
+        """Returns results close to the destination json format. Changing the content if
+        th config has a setting "'list_of_strings': True" for the domain or if the config
+        has a setting "'is_image': True" for the domain.
+        """
         res = {}
-        for x in self.config['types'].items():
-            if self.config['types'][x[0]].get('list_of_strings') == True:
-                #dbg('--->List of Strings: %s' % self._results[x[0]]['raw_text'])
-                try:
-                    res[x[0]] = [y for y in self._results[x[0]]['raw_text']]
-                except:
-                    self._dbg('Error data %s:' % self._results[x[0]])
-                    self._dbg(self._results[x[0]])
-            elif self.config['types'][x[0]].get('is_image') == True:
-                if self._results[x[0]].get('images'):
-                    res[x[0]] = [self.genFnameForResultImage(img_name) for img_name in self._results[x[0]]['images']]
+        for item in self.config['types'].items():
+            if self.config['types'][item[0]].get('list_of_strings') is True:
+                #dbg('--->List of Strings: %s' % self._results[item[0]]['raw_text'])
+                res[item[0]] = [y for y in self._results[item[0]]['raw_text']]
+                #try:
+                #    res[item[0]] = [y for y in self._results[item[0]]['raw_text']]
+                ##except:
+                #    self._dbg('Error data %s:' % self._results[item[0]])
+                #    self._dbg(self._results[item[0]])
+            elif self.config['types'][item[0]].get('is_image') is True:
+                if self._results[item[0]].get('images'):
+                    res[item[0]] = [self.gen_fname_for_result_image(img_name)
+                                    for img_name in self._results[item[0]]['images']]
             else:
-                res[x[0]] = self._results[x[0]]['text']
+                res[item[0]] = self._results[item[0]]['text']
         return res
 
 
-    def saveResults(self, results_dir=None, results_file_name=None):
-        filepath = self.genFnameForResultJson(results_dir, results_file_name)
+    def save_results(self, results_dir=None, results_file_name=None):
+        """Saving text results of paragraph uploading to the destination file"""
+        filepath = self.gen_fname_for_result_json(results_dir, results_file_name)
 
         with io.open(filepath, 'w', encoding='utf8') as json_file:
-            json.dump(self.getResultsForSave(), json_file, ensure_ascii=False, indent=3)
+            json.dump(self.get_results_for_save(), json_file, ensure_ascii=False, indent=3)
 
 
-    def getInternalResults(self):
+    def get_internal_results(self):
+        """Returns internal results of recognition"""
         return self._results
 
 
-    def getConfig(self):
-        return self.config
+    def get_ordered_config(self):
+        """Return ordered config"""
+        return self._config_ordered
 
 
-    def getOrderedConfig(self):
-        return self._config_ordered 
-
-
-    def getConfigStr(self):
+    def get_config_str(self):
+        """Return config as json"""
         return json.dumps(self.config, indent=4, sort_keys=True)
 
 
-    def addParagraph(self, p):
-        self.pStorage.append({
-            'id': p.getId(),
-            'text': p.getText(),
-            'ref': p
-        })
+    #def add_paragraph(self, para):
+    #    self.pStorage.append({
+    #        'id': para.getId(),
+    #        'text': para.getText(),
+    #        'ref': para
+    #    })
 
-    def getParagraphsText(self, cleaned=True):
-        if cleaned:
-            return [p['ref'].getCleanedText() for p in self.pStorage]
-        else:
-            return [p['ref'].getText() for p in self.pStorage]
+    #def get_paragraphs_text(self, cleaned=True):
+    #    if cleaned:
+    #        return [p['ref'].getCleanedText() for p in self.pStorage]
+    #    else:
+    #        return [p['ref'].getText() for p in self.pStorage]
 
     #def getParagraphsId(self):
     #    return [p['id'] for p in self.pStorage]
@@ -265,65 +289,71 @@ class ASOZDParser(DOCXDocument):
     #    return [p['ref'] for p in self.pStorage]
 
 
-    def recognizeParagraph(self, p):
-        #dbg('Paragraph text (%s): %s' % (p._item.tag, p.getCleanedText()))
-        for r in self._re_list.items():
-            tmp_re = re.compile(r[0])
-            #dbg('Trying to recognize paragraph [%s] as %s with regex %s' % (p.getId(), r[1], r[0]))
-            if tmp_re.match(p.getCleanedText().strip()):
+    def recognize_paragraph(self, para):
+        """Run process of recognition of paragraph.
+        Looping over internal config and applying 'check_re' regular expressions to
+        determine type of the paragraph content.
+        """
+        #dbg('Paragraph text (%s): %s' % (para._item.tag, para.getCleanedText()))
+        for regexp in self._re_list.items():
+            tmp_re = re.compile(regexp[0])
+            #dbg('Trying to recognize paragraph [%s] as \
+            # %s with regex %s' % (para.getId(), r[1], r[0]))
+            if tmp_re.match(para.getCleanedText().strip()):
 
-                not_re = self.config['types'][r[1]].get('not_re')
+                not_re = self.config['types'][regexp[1]].get('not_re')
                 if not_re:
                     tmp_not_re = re.compile(not_re)
-                    if not tmp_not_re.match(p.getCleanedText().strip()):
-                        #dbg('Paragraph text: '+p.getCleanedText())
-                        return r[1]
+                    if not tmp_not_re.match(para.getCleanedText().strip()):
+                        #dbg('Paragraph text: '+para.getCleanedText())
+                        return regexp[1]
                     else:
                         pass
                 else:
-                    return r[1]
-            
+                    return regexp[1]
+
         return None
 
-    def loadParagraphs(self):
-        
+    def load_paragraphs(self):
+        """Load docx paragraphs (one by one) to instance with recognition all of them
+        """
         # open file
-        Doc = self._doc
+        document = self._doc
 
         # load data from file
-        Doc.load()
-        
+        document.load()
+
         # iterate over document paragraphs
-        pi = 1
+        par_iter = 1
         last_recognized_type = None
         #last_recognized_pi = None
 
-        for praw in Doc.getDocParagraphsIter():
+        for praw in document.get_doc_paragraphs_iter():
 
             # dbg - start
             #self._dbg([c.name for c in praw.findChildren(recursive=False)])
             # dbg - stop
 
-            p = DOCXParagraph(praw, docx=Doc)
+            para = DOCXParagraph(praw, docx=document)
             #self.addParagraph(p)
-            self._dbg('----> (%02d) Paragraph '%pi + p.getId())
-            
-            if p.getCleanedText().strip() == '':
-                self._dbg('Paragraph %s text is empty. Skipping it.' % p.getId())
+            self._dbg('----> (%02d) Paragraph '% par_iter + para.getId())
+
+            if para.getCleanedText().strip() == '':
+                self._dbg('Paragraph %s text is empty. Skipping it.' % para.getId())
                 continue
-            
-            p_type = self.recognizeParagraph(p)
+
+            p_type = self.recognize_paragraph(para)
 
             if p_type or last_recognized_type:
 
                 # forming paragraph text as joining raw data without any join chars
-                par_text = ''.join(p.getRawText())
+                par_text = ''.join(para.getRawText())
 
                 # to avoid fragmented values within raw value we split text into strings
                 # it is usefull for lobby parsing, because every word in docx could be
                 # separated to own element and it is difficult to strip 'check_re' matches
                 # from the list where evary word is element
-                raw_text = par_text.split(self.linesep)
+                #raw_text = par_text.split(self.linesep)
 
                 work_type = p_type if p_type else last_recognized_type
 
@@ -331,40 +361,42 @@ class ASOZDParser(DOCXDocument):
                 extra_types_list = self.get_config(work_type, 'also_contains')
                 if extra_types_list:
 
-                    self._dbg('Found %d extra types: %s' % (len(extra_types_list), extra_types_list))
+                    self._dbg('Found %d extra types: %s' % \
+                        (len(extra_types_list), extra_types_list))
                     for extra_type in extra_types_list:
                         if self.get_config(extra_type, 'is_image'):
                             self._dbg('Try to find images within paragraph')
-                            for img in p.getImages():
-                                drw = DOCXDrawing(img, docx=Doc, debug=self.is_debug())
+                            for img in para.getImages():
+                                drw = DOCXDrawing(img, docx=document, debug=self.is_debug())
                                 img_name = drw.getImageName()
                                 self._dbg('Image %s found' % img_name)
 
                                 # adding image to result
-                                self.addResultImage(extra_type, img_name)
+                                self.add_result_image(extra_type, img_name)
 
                         elif self.get_config(extra_type, 'text_re'):
                             self._dbg("Found 'text_re' for %s" % extra_type)
-                            self._dbg('Searching [%s] in [%s]' % (self.get_config(extra_type, 'text_re'), par_text))
-                            m = re.search(self.get_config(extra_type, 'text_re'), par_text)
-                            if m:
-                                search_res = m.group(0).strip()
-                                self.addResult(extra_type, search_res)
+                            self._dbg('Searching [%s] in [%s]' %
+                                      (self.get_config(extra_type, 'text_re'), par_text))
+                            match_res = re.search(self.get_config(extra_type, 'text_re'), par_text)
+                            if match_res:
+                                search_res = match_res.group(0).strip()
+                                self.add_result(extra_type, search_res)
                                 if not self.get_config(extra_type, 'leave_also_contains_data'):
                                     par_text = par_text.replace(search_res, '')
-                
+
                 if p_type:
                     self._dbg('Paragraph recognized as [%s]' % p_type)
                     last_recognized_type = p_type
-                    
+
                     # save result
                     #self.addResult(p_type, par_text, par_raw_text, replace_check_re_with='')
-                    self.addResult(p_type, par_text, replace_check_re_with='')
+                    self.add_result(p_type, par_text, replace_check_re_with='')
                 elif last_recognized_type:
-                    self._dbg('Paragraph hasn''t recognized. Add data to the last recognized as [%s]' % last_recognized_type)
-                    #self.addResult(last_recognized_type, self.linesep + par_text, [self.linesep] + par_raw_text)
-                    self.addResult(last_recognized_type, self.linesep + par_text)
+                    self._dbg('Paragraph hasn''t recognized. Add data to the last '+\
+                        'recognized as [%s]' % last_recognized_type)
+                    self.add_result(last_recognized_type, self.linesep + par_text)
             else:
-                self._dbg('Warning! Paragraph iter %d was skipped.' % pi)
-            
-            pi = pi + 1
+                self._dbg('Warning! Paragraph iter %d was skipped.' % par_iter)
+
+            par_iter = par_iter + 1

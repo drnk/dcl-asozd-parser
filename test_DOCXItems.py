@@ -8,13 +8,13 @@ from DOCX.document import DOCXDocument
 
 class DOCXItemTest(unittest.TestCase):
     """DOCXText tests"""
-    
+
     doc = None
     soup = None
 
     @classmethod
     def setUpClass(cls):
-        cls.test_file_name = 'test/source_n1.docx' 
+        cls.test_file_name = 'test/source_n1.docx'
 
         cls.zf = ZipFile(cls.test_file_name, 'r')
 
@@ -24,31 +24,31 @@ class DOCXItemTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         pass
-    
+
 
 class DOCXTextTest(DOCXItemTest):
     """DOCXText tests"""
-    
+
     def test_DOCXText_getText(self):
         """getText() contents for <w:t> text element"""
-        
+
         t = DOCXText(self.soup_doc.find(DOCXText.full_tag_name))
         self.assertEqual(t.getText(), 'Бессарабов Даниил Владимирович')
 
 
 class DOCXBrTest(DOCXItemTest):
     """DOCXBr tests"""
-    
+
     def test_DOCXBr_getText_equals_lineseparator(self):
         """getText() for <w:br> text returns line separator"""
-        
+
         t = DOCXBr(self.soup_doc.find(DOCXBr.full_tag_name))
         self.assertEqual(t.getText(), os.linesep)
 
 
 class DOCXDrawingTest(DOCXItemTest):
     """DOCXDrawing tests"""
-    
+
     def setUp(self):
         # initiates DOCXDocument
         self.doc = DOCXDocument(self.test_file_name)
@@ -60,12 +60,12 @@ class DOCXDrawingTest(DOCXItemTest):
     def test_DOCXDrawing_getText_returns_None(self):
         """getText() contents for <w:drawing> return None"""
         self.assertEqual(self.d.getText(), None)
-        
+
     def test_DOCXDrawing_getImageName(self):
         """getImageName() contents for <w:drawing>"""
         image_name = self.d.getImageName()
         self.assertEqual(image_name, 'media/image2.jpg')
- 
+
 
 class DOCXRunTest(DOCXItemTest):
     """DOCXRun tests"""
@@ -189,4 +189,4 @@ class DOCXParagraphTest(DOCXItemTest):
 
 
 if __name__ == '__main__':
-   unittest.main()
+    unittest.main()

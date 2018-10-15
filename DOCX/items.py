@@ -133,7 +133,7 @@ class DOCXDrawing(DOCXItem):
             #  <a:blip r:embed="rId6"/>
             rId = embed_tag.get('r:embed')
             if rId and self.getDoc():
-                return self.getDoc().getRelationshipTargetById(rId)
+                return self.getDoc().get_relationship_target_by_id(rId)
 
         return None
 
@@ -150,7 +150,7 @@ class DOCXHyperlink(DOCXItem):
     def _getRawText(self):
         href = None
         if self.getDoc():
-            href = self.getDoc().getRelationshipTargetById(self.getRelationshipId())
+            href = self.getDoc().get_relationship_target_by_id(self.getRelationshipId())
 
         text = DOCXRun(self._item.find(DOCXRun.full_tag_name)).getText()
         return ['<a href="%s">%s</a>' % (href, text)]

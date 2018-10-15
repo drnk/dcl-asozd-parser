@@ -1,7 +1,6 @@
 import os
 import os.path
 import unittest
-import shutil
 import json
 
 from asozd import ASOZDParser
@@ -15,14 +14,14 @@ DEST_FNAME2 = 'test_asozd_source_n2'
 
 class ASOZDParserResultsTest1(unittest.TestCase):
     """ASOZDParser tests"""
-    
+
     @classmethod
     def setUpClass(cls):
         cls.test_file_name = 'test\\source_n1.docx' 
 
         cls.instance = ASOZDParser(cls.test_file_name)
         # parse
-        cls.instance.loadParagraphs()
+        cls.instance.load_paragraphs()
 
         try:
             os.mkdir(DEST_DIR)
@@ -30,7 +29,7 @@ class ASOZDParserResultsTest1(unittest.TestCase):
             pass
 
         # storing parsed results
-        cls.instance.saveResults(results_dir=DEST_DIR, results_file_name=DEST_FNAME1)
+        cls.instance.save_results(results_dir=DEST_DIR, results_file_name=DEST_FNAME1)
         with open('%s\\%s.json' % (DEST_DIR, DEST_FNAME1), 'r', encoding='utf-8') as json_file:
             cls.data = json.loads(json_file.read())
         #cls.instance.saveResultImages(results_dir=DEST_DIR)
@@ -173,7 +172,7 @@ class ASOZDParserResultsTest2(unittest.TestCase):
 
         cls.instance = ASOZDParser(cls.test_file_name)
         # parse
-        cls.instance.loadParagraphs()
+        cls.instance.load_paragraphs()
 
         try:
             os.mkdir(DEST_DIR)
@@ -181,7 +180,7 @@ class ASOZDParserResultsTest2(unittest.TestCase):
             pass
 
         # storing parsed results
-        cls.instance.saveResults(results_dir=DEST_DIR, results_file_name=DEST_FNAME2)
+        cls.instance.save_results(results_dir=DEST_DIR, results_file_name=DEST_FNAME2)
         with open('%s\\%s.json' % (DEST_DIR, DEST_FNAME2), 'r', encoding='utf-8') as json_file:
             cls.data = json.loads(json_file.read())
         #cls.instance.saveResultImages(results_dir=DEST_DIR)
