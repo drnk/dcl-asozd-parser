@@ -54,8 +54,8 @@ Example (Unix): ./parser.py "in"
         print('Looking %s file for valuable content.' % fname)
 
         # parser init
-        P = ASOZDParser(args.fname + '\\' + fname if is_directory else args.fname, debug_mode=DEBUG)
-        
+        P = ASOZDParser(args.fname + '\\' + fname if is_directory else args.fname, debug=DEBUG)
+
         # parse start
         P.load_paragraphs()
 

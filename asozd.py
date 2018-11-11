@@ -297,15 +297,15 @@ class ASOZDParser(DOCXDocument):
         #dbg('Paragraph text (%s): %s' % (para._item.tag, para.getCleanedText()))
         for regexp in self._re_list.items():
             tmp_re = re.compile(regexp[0])
-            #dbg('Trying to recognize paragraph [%s] as \
-            # %s with regex %s' % (para.getId(), r[1], r[0]))
+            self._dbg('Trying to recognize paragraph [%s] as %s with regex %s' % (para.getId(), regexp[1], regexp[0]))
+            #self._dbg('Paragraph text: %s' % para.getCleanedText().strip())
             if tmp_re.match(para.getCleanedText().strip()):
 
                 not_re = self.config['types'][regexp[1]].get('not_re')
                 if not_re:
                     tmp_not_re = re.compile(not_re)
                     if not tmp_not_re.match(para.getCleanedText().strip()):
-                        #dbg('Paragraph text: '+para.getCleanedText())
+                        self._dbg('Paragraph text: '+para.getCleanedText())
                         return regexp[1]
                     else:
                         pass
