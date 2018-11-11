@@ -57,11 +57,11 @@ Example (Unix): ./parser.py "in"
         P = ASOZDParser(args.fname + '\\' + fname if is_directory else args.fname, debug_mode=DEBUG)
         
         # parse start
-        P.loadParagraphs()
+        P.load_paragraphs()
 
         #pprint(P.getInternalResults())
 
         # storing parsed results
-        P.saveResults(results_dir=args.destination, results_file_name=dest_file_name)
-        P.saveResultImages(results_dir=args.destination)
+        P.save_results(results_dir=args.destination, results_file_name=dest_file_name)
+        P.save_result_images(results_dir=args.destination)
 

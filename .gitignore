@@ -15,3 +15,7 @@ out/*
 
 # pytest
 .pytest_cache
+
+# other
+source
+source_doc
