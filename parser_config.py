@@ -55,10 +55,11 @@ config = {
         'family': {
             'order_id': 8,
             'name': 'family',
-            'text_re': r'(<a[^>]+>)?([А-Яа-я\s]+)?(Женат|женат|замужем|Замужем).*?(?<!г)\.', # regexp for retrieving extra content 
+            'text_re': r'(<a[^>]+>)?([А-Яа-яё\s]+)?(Женат|женат|замужем|Замужем).*?(?<!г)(\.|$)', # regexp for retrieving extra content 
                                                                              # data from  paragraph text
-            'leave_also_contains_data': False, # don't touch data matched to text_re within original text,
-                                               # otherwise data will be cropped
+            'leave_also_contains_data': True, # don't touch data matched to text_re within original text,
+                                              # otherwise data will be cropped
+            'remove_links': True,
 
             # Examples:
             # Депутат женат с 2013 г., имеет дочь.
@@ -77,6 +78,7 @@ config = {
             'check_re': r'Группа лоббистов:?\s*',
             'list_of_strings': True, # export as list of strings,
                                      # otherwise content data will be exported like one string
+            'remove_empty_items': True,
         }
     }
 }

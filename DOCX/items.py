@@ -106,7 +106,6 @@ class DOCXItem(object):
         """Return text element value cleaned from the element (<el>text</el> -> text)"""
         return CLEANING_REGEXP.sub('', self.getText())
 
-
 class DOCXParagraph(DOCXItem):
     """Paragraph definition for docs document"""
 

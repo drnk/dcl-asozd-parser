@@ -231,7 +231,10 @@ class ASOZDParser(DOCXDocument):
         for item in self.config['types'].items():
             if self.config['types'][item[0]].get('list_of_strings') is True:
                 #dbg('--->List of Strings: %s' % self._results[item[0]]['raw_text'])
-                res[item[0]] = [y for y in self._results[item[0]]['raw_text']]
+                if self.config['types'][item[0]].get('remove_empty_items') is True:
+                    res[item[0]] = [y for y in self._results[item[0]]['raw_text'] if y.split()]
+                else:
+                    res[item[0]] = [y for y in self._results[item[0]]['raw_text']]
                 #try:
                 #    res[item[0]] = [y for y in self._results[item[0]]['raw_text']]
                 ##except:
@@ -375,10 +378,15 @@ class ASOZDParser(DOCXDocument):
                                 self.add_result_image(extra_type, img_name)
 
                         elif self.get_config(extra_type, 'text_re'):
+                            
+                            # check do we need to remove links or not
+                            if self.get_config(extra_type, 'remove_links'):
+                                extra_par_text = para.getCleanedText()
+
                             self._dbg("Found 'text_re' for %s" % extra_type)
                             self._dbg('Searching [%s] in [%s]' %
-                                      (self.get_config(extra_type, 'text_re'), par_text))
-                            match_res = re.search(self.get_config(extra_type, 'text_re'), par_text)
+                                      (self.get_config(extra_type, 'text_re'), extra_par_text))
+                            match_res = re.search(self.get_config(extra_type, 'text_re'), extra_par_text)
                             if match_res:
                                 search_res = match_res.group(0).strip()
                                 self.add_result(extra_type, search_res)
