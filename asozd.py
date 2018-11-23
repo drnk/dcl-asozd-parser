@@ -17,9 +17,9 @@ from DOCX.items import DOCXParagraph, DOCXDrawing
 CONFIG_FILE_NAME = 'parser_config.json'
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-IN_DIR = '\\in'
-OUT_DIR = '\\out'
-IMAGES_OUT_DIR = OUT_DIR + '\\images'
+IN_DIR = 'in'
+OUT_DIR = 'out'
+IMAGES_OUT_DIR = 'images'
 
 DEBUG = True
 
@@ -186,12 +186,15 @@ class ASOZDParser(DOCXDocument):
             filename = self.get_fio()
 
         if results_dir:
-            out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
+            #out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
+            out_dir = results_dir
         else:
-            out_dir = '%s\\%s\\' % (BASE_DIR, OUT_DIR)
+            #out_dir = '%s\\%s\\' % (BASE_DIR, OUT_DIR)
+            out_dir = os.path.join(BASE_DIR, OUT_DIR)
 
         fileext = 'json'
-        return '%s\\%s.%s' % (out_dir, filename, fileext)
+        #return '%s\\%s.%s' % (out_dir, filename, fileext)
+        return os.path.join(out_dir, '%s.%s' % (filename, fileext))
 
 
     def gen_abs_fname_for_result_image(self, original_image_name, results_dir=None):
@@ -199,15 +202,17 @@ class ASOZDParser(DOCXDocument):
         filepath = self.gen_fname_for_result_image(original_image_name)
 
         if results_dir:
-            out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
+            #out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
+            out_dir = results_dir
         else:
-            out_dir = '%s\\' % BASE_DIR
+            #out_dir = '%s\\' % BASE_DIR
+            out_dir = os.path.join(BASE_DIR, OUT_DIR)
 
         #if filepath:
         #    return '%s%s' % (out_dir, filepath)
         #else:
         #    return None
-        return '%s%s' % (out_dir, filepath) if filepath else None
+        return os.path.join(out_dir, filepath) if filepath else None
 
 
     def gen_fname_for_result_image(self, original_image_name):
@@ -218,7 +223,8 @@ class ASOZDParser(DOCXDocument):
             fileext = match_res.groups(1)[0]
             #self._dbg('Image name extenstion: %s' % fileext)
             if fileext:
-                return '%s\\%s.%s' % (IMAGES_OUT_DIR, filename, fileext)
+                #return '%s\\%s.%s' % (IMAGES_OUT_DIR, filename, fileext)
+                return os.path.join(IMAGES_OUT_DIR, '%s.%s' % (filename, fileext))
         return None
 
 
@@ -249,7 +255,7 @@ class ASOZDParser(DOCXDocument):
         return res
 
 
-    def save_results(self, results_dir=None, results_file_name=None):
+    def save_results_json(self, results_dir=None, results_file_name=None):
         """Saving text results of paragraph uploading to the destination file"""
         filepath = self.gen_fname_for_result_json(results_dir, results_file_name)
 
@@ -408,3 +414,28 @@ class ASOZDParser(DOCXDocument):
                 self._dbg('Warning! Paragraph iter %d was skipped.' % par_iter)
 
             par_iter = par_iter + 1
+
+
+    def recreate_dest_folder_sturture(self, results_dir=None):
+        """Creates default or specified output directory structure"""
+
+        if results_dir:
+            out_json_dir = results_dir
+        else:
+            out_json_dir = os.path.join(BASE_DIR, OUT_DIR)
+
+        out_images_dir = os.path.join(out_json_dir, IMAGES_OUT_DIR) 
+        
+        # verifying out json directory
+        if not os.path.exists(out_json_dir):
+            os.makedirs(out_json_dir)
+
+        # verifying out images directory
+        if not os.path.exists(out_images_dir):
+            os.makedirs(out_images_dir)
+
+
+    def save_all_results(self, results_dir=None, results_file_name=None):
+        self.recreate_dest_folder_sturture(results_dir=results_dir)
+        self.save_results_json(results_dir=results_dir, results_file_name=results_file_name)
+        self.save_result_images(results_dir=results_dir)
