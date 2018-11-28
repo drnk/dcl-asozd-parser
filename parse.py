@@ -58,6 +58,8 @@ Example (Unix): ./parser.py "in"
             P.load_paragraphs()
             # storing parsed results
             P.save_all_results(results_dir=dest_dir, results_file_name=dest_file_name)
+        except KeyboardInterrupt:
+            raise
         except:
             print('='*50)
             print("!!!PARSING ERROR OCCURED!!!")
