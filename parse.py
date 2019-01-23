@@ -23,7 +23,7 @@ Example (Unix): ./parser.py "in"
 
     parser.add_argument("-d", "--destination", help="Destination directory ('out' used by default)")
     parser.add_argument("-j", "--jsonFileName", help="Destination file name (without extension) if fileName references to file")
-    parser.add_argument("-dbg", "--debug_mode", help="Debug mode")
+    parser.add_argument("-dbg", nargs='?', dest='debug_mode', const=True, default=False, help="Debug mode")
 
     args = parser.parse_args()
 
