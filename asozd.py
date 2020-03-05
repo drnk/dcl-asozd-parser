@@ -84,34 +84,41 @@ class ASOZDParser(DOCXDocument):
         for item in self.config['types'].items():
             if item[1].get('check_re'):
                 dct[item[1]['order_id']] = item[0]
+        zero_get = operator.itemgetter(0)
         self._config_ordered = \
-            [self.config['types'][x[1]] for x in sorted(dct.items(), key=operator.itemgetter(0))]
-        #self._dbg('Ordered config created:')
-        #pprint(self._config_ordered)
+            [self.config['types'][x[1]]
+             for x in sorted(dct.items(), key=zero_get)]
+        # self._dbg('Ordered config created:')
+        # pprint(self._config_ordered)
 
-        #dct = {}
-        #for item in self.config['types'].items():
-        #    dct[item[0]] = {
-        #        'text': None,
-        #        'raw_text': []
-        #    }
-        #self._results = dct
-        self._results = {item[0]: {'text': None, 'raw_text': []}\
-            for item in self.config['types'].items()}
+        # dct = {}
+        # for item in self.config['types'].items():
+        #     dct[item[0]] = {
+        #         'text': None,
+        #         'raw_text': []
+        #     }
+        # self._results = dct
+        self._results = {item[0]: {'text': None, 'raw_text': []}
+                         for item in self.config['types'].items()}
 
     def get_config(self, res_type, key):
         """Returns config 'key' value for specified 'type'"""
         return self.config['types'][res_type].get(key)
 
-    def add_result(self, res_type, text, raw_text=None, replace_check_re_with=None):
+    def add_result(self,
+                   res_type,
+                   text,
+                   raw_text=None,
+                   replace_check_re_with=None):
         """Adds recognition result to internal storage"""
 
         replacement = replace_check_re_with
-        config_dont_replace = self.get_config(res_type, 'do_not_replace_check_re')
+        config_dont_replace = \
+            self.get_config(res_type, 'do_not_replace_check_re')
 
         text_to_save = text
 
-        #raw_text_to_save = [x[0] for x in raw_text]
+        # raw_text_to_save = [x[0] for x in raw_text]
         if raw_text:
             raw_text_to_save = raw_text.copy()
         else:
@@ -119,15 +126,18 @@ class ASOZDParser(DOCXDocument):
 
         if not(replacement is None) and not config_dont_replace:
             # replace find pattern string in plain text
-            text_to_save = re.sub(self.get_config(res_type, 'check_re'), replacement, text_to_save)
+            text_to_save = re.sub(
+                self.get_config(res_type, 'check_re'),
+                replacement,
+                text_to_save
+            )
 
             # replace find pattern string in raw text list
             if raw_text_to_save:
                 if re.sub(self.get_config(res_type, 'check_re'),
                           replacement,
-                          raw_text_to_save[0]
-                         ) == '':
-                    self._dbg('Raw-text-to-save element removed %s' % raw_text_to_save[0])
+                          raw_text_to_save[0]) == '':
+                    logger.debug(f'Raw-text-to-save element removed {raw_text_to_save[0]}')
                     raw_text_to_save.pop(0)
 
         # adding plain text to internal storage
@@ -140,7 +150,7 @@ class ASOZDParser(DOCXDocument):
 
     def add_result_image(self, res_type, image_name):
         """Adding image data to specific result domain"""
-        self._dbg("Adding image %s for recognized %s" % (image_name, res_type))
+        logger.debug("Adding image %s for recognized %s" % (image_name, res_type))
         if self._results[res_type].get('images'):
             self._results[res_type]['images'].append(image_name)
         else:
@@ -156,7 +166,9 @@ class ASOZDParser(DOCXDocument):
             for img_name in self._results['photo']['images']:
                 self._dbg('Trying to save image: %s' % img_name)
 
-                filename = self.gen_abs_fname_for_result_image(img_name, results_dir)
+                filename = self.gen_abs_fname_for_result_image(
+                    img_name, results_dir
+                )
                 if filename:
                     with open(filename, 'wb') as fimg:
                         try:
@@ -168,8 +180,15 @@ class ASOZDParser(DOCXDocument):
                                 docx_img.close()
                 self._dbg('Image saved.')
 
-    def gen_fname_for_result_json(self, results_dir=None, results_file_name=None):
-        """Returns filename for docx parsing results (adding json as the extenstion)"""
+    def gen_fname_for_result_json(
+            self,
+            results_dir=None,
+            results_file_name=None):
+        """
+        Returns filename for docx parsing results.
+
+        With adding json as the extension.
+        """
         if results_file_name:
             if results_file_name.endswith('.json'):
                 filename = results_file_name.replace('.json', '')
@@ -185,7 +204,10 @@ class ASOZDParser(DOCXDocument):
 
         return os.path.join(out_dir, '%s.%s' % (filename, 'json'))
 
-    def gen_abs_fname_for_result_image(self, original_image_name, results_dir=None):
+    def gen_abs_fname_for_result_image(
+            self,
+            original_image_name,
+            results_dir=None):
         """Returns absolute file destination path for image"""
         filepath = self.gen_fname_for_result_image(original_image_name)
 
@@ -194,24 +216,22 @@ class ASOZDParser(DOCXDocument):
         else:
             out_dir = os.path.join(BASE_DIR, OUT_DIR)
 
-        #if filepath:
-        #    return '%s%s' % (out_dir, filepath)
-        #else:
-        #    return None
-        return os.path.join(out_dir, filepath) if filepath else None
-
+        return os.path.join(out_dir, filepath) or None
 
     def gen_fname_for_result_image(self, original_image_name):
-        """Returns destination file name for image"""
+        """Destination file name for image."""
         filename = self.get_fio()
         match_res = re.search(r'\.(.+)$', original_image_name)
+        result = None
         if match_res:
             fileext = match_res.groups(1)[0]
-            #self._dbg('Image name extenstion: %s' % fileext)
+            logger.debug('Image name extenstion: {}'.format(fileext))
             if fileext:
-                #return '%s\\%s.%s' % (IMAGES_OUT_DIR, filename, fileext)
-                return os.path.join(IMAGES_OUT_DIR, '%s.%s' % (filename, fileext))
-        return None
+                result = os.path.join(
+                    IMAGES_OUT_DIR,
+                    '{}.{}'.format(filename, fileext)
+                )
+        return result
 
     def get_results_for_save(self):
         """
