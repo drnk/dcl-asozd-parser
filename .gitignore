@@ -10,6 +10,7 @@ __pycache__
 # test documents
 in/*
 out/*
+test/results/*
 
 # logs
 **/*.log

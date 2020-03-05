@@ -39,7 +39,7 @@ class ASOZDParser(DOCXDocument):
     def __init__(self, file_name, *args, **kwargs):
         super(ASOZDParser, self).__init__(file_name, *args, **kwargs)
 
-        #if kwargs.get('debug'):
+        # if kwargs.get('debug'):
         #    self._debug = (kwargs.get('debug') == True)
 
         self._line_separator = os.linesep
@@ -54,7 +54,7 @@ class ASOZDParser(DOCXDocument):
         self.config = config
 
         # list for storing paragraph data
-        #self.pStorage = []
+        # self.pStorage = []
 
         self._init_config()
 
@@ -79,8 +79,6 @@ class ASOZDParser(DOCXDocument):
             if item[1].get('check_re'):
                 dct[item[1]['check_re']] = item[0]
         self._re_list = dct
-        #self._dbg('RE list created:')
-        #pprint(self._re_list)
 
         dct = {}
         for item in self.config['types'].items():
