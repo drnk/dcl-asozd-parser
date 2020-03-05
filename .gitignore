@@ -1,6 +1,7 @@
 # virtual env and ide settings
 .env
 .vscode
+.venv
 
 # python
 **/*.pyc

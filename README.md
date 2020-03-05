@@ -12,7 +12,35 @@ Used packages:
 * beautifulsoup4
 * lxml
 
+## Installation
 
-Testing
-------------
+1. Clone a repository:
 
+   ```bash
+   git clone git@github.com:drnk/dcl-asozd-parser.git
+   ```
+
+2. Create virtual environment and start it:
+
+   ```bash
+   cd dcl-asozd-parser
+   python -m venv .venv
+
+   # unix
+   source .venv/bin/activate
+   # windows
+   .venv\Scripts\activate.bat
+   ```
+
+3. Upgrade `pip` and download and install necessary libraries:
+
+   ```bash
+   python -m pip install -U pip
+   pip install -r requirements.txt
+   ```
+
+## Testing
+
+```bash
+pytest
+```
