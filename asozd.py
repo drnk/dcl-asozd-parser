@@ -2,6 +2,7 @@
 Definition of ASOZDParser class.
 Provides parser logic for docx files.
 """
+import logging
 import io
 import shutil
 import os
@@ -14,12 +15,14 @@ from DOCX.document import DOCXDocument
 from DOCX.items import DOCXParagraph, DOCXDrawing
 
 
-CONFIG_FILE_NAME = 'parser_config.json'
+logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-IN_DIR = 'in'
-OUT_DIR = 'out'
-IMAGES_OUT_DIR = 'images'
+CONFIG_FILE_NAME = r'parser_config.json'
+
+BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+IN_DIR = r'in'
+OUT_DIR = r'out'
+IMAGES_OUT_DIR = r'images'
 
 DEBUG = True
 
@@ -66,11 +69,9 @@ class ASOZDParser(DOCXDocument):
         """Operation system specific line separator value"""
         return self._line_separator
 
-
     def get_doc(self):
         """Returns reference to Document"""
         return self._doc
-
 
     def _init_config(self):
         dct = {}
@@ -100,11 +101,9 @@ class ASOZDParser(DOCXDocument):
         self._results = {item[0]: {'text': None, 'raw_text': []}\
             for item in self.config['types'].items()}
 
-
     def get_config(self, res_type, key):
         """Returns config 'key' value for specified 'type'"""
         return self.config['types'][res_type].get(key)
-
 
     def add_result(self, res_type, text, raw_text=None, replace_check_re_with=None):
         """Adds recognition result to internal storage"""
@@ -141,7 +140,6 @@ class ASOZDParser(DOCXDocument):
             (self._results[res_type]['raw_text'] if self._results[res_type]['raw_text'] else []) \
             + raw_text_to_save
 
-
     def add_result_image(self, res_type, image_name):
         """Adding image data to specific result domain"""
         self._dbg("Adding image %s for recognized %s" % (image_name, res_type))
@@ -150,11 +148,9 @@ class ASOZDParser(DOCXDocument):
         else:
             self._results[res_type]['images'] = [image_name]
 
-
     def get_fio(self):
         """Returns 'fio' text value for the instance"""
         return self._results['fio']['text'].strip()
-
 
     def save_result_images(self, results_dir=None):
         """Copying images from docx zip structure to the destination folder"""
@@ -174,7 +170,6 @@ class ASOZDParser(DOCXDocument):
                                 docx_img.close()
                 self._dbg('Image saved.')
 
-
     def gen_fname_for_result_json(self, results_dir=None, results_file_name=None):
         """Returns filename for docx parsing results (adding json as the extenstion)"""
         if results_file_name:
@@ -186,26 +181,19 @@ class ASOZDParser(DOCXDocument):
             filename = self.get_fio()
 
         if results_dir:
-            #out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
             out_dir = results_dir
         else:
-            #out_dir = '%s\\%s\\' % (BASE_DIR, OUT_DIR)
             out_dir = os.path.join(BASE_DIR, OUT_DIR)
 
-        fileext = 'json'
-        #return '%s\\%s.%s' % (out_dir, filename, fileext)
-        return os.path.join(out_dir, '%s.%s' % (filename, fileext))
-
+        return os.path.join(out_dir, '%s.%s' % (filename, 'json'))
 
     def gen_abs_fname_for_result_image(self, original_image_name, results_dir=None):
         """Returns absolute file destination path for image"""
         filepath = self.gen_fname_for_result_image(original_image_name)
 
         if results_dir:
-            #out_dir = results_dir if results_dir.endswith('\\') else results_dir + '\\'
             out_dir = results_dir
         else:
-            #out_dir = '%s\\' % BASE_DIR
             out_dir = os.path.join(BASE_DIR, OUT_DIR)
 
         #if filepath:
@@ -227,9 +215,11 @@ class ASOZDParser(DOCXDocument):
                 return os.path.join(IMAGES_OUT_DIR, '%s.%s' % (filename, fileext))
         return None
 
-
     def get_results_for_save(self):
-        """Returns results close to the destination json format. Changing the content if
+        """
+        Returns results close to the destination json format.
+
+        Changing the content if
         th config has a setting "'list_of_strings': True" for the domain or if the config
         has a setting "'is_image': True" for the domain.
         """
@@ -254,24 +244,28 @@ class ASOZDParser(DOCXDocument):
                 res[item[0]] = self._results[item[0]]['text']
         return res
 
-
     def save_results_json(self, results_dir=None, results_file_name=None):
-        """Saving text results of paragraph uploading to the destination file"""
-        filepath = self.gen_fname_for_result_json(results_dir, results_file_name)
+        """Saving text results of paragraph uploading to the destination file."""
+        filepath = self.gen_fname_for_result_json(
+            results_dir,
+            results_file_name
+        )
 
         with io.open(filepath, 'w', encoding='utf8') as json_file:
-            json.dump(self.get_results_for_save(), json_file, ensure_ascii=False, indent=3)
-
+            json.dump(
+                self.get_results_for_save(),
+                json_file,
+                ensure_ascii=False,
+                indent=3
+            )
 
     def get_internal_results(self):
         """Returns internal results of recognition"""
         return self._results
 
-
     def get_ordered_config(self):
         """Return ordered config"""
         return self._config_ordered
-
 
     def get_config_str(self):
         """Return config as json"""
@@ -299,9 +293,12 @@ class ASOZDParser(DOCXDocument):
 
 
     def recognize_paragraph(self, para):
-        """Run process of recognition of paragraph.
-        Looping over internal config and applying 'check_re' regular expressions to
-        determine type of the paragraph content.
+        """
+        Run process of recognition of paragraph.
+
+        Looping over internal config and applying `check_re`
+        regular expressions to determine type of the
+        paragraph content.
         """
         #dbg('Paragraph text (%s): %s' % (para._item.tag, para.getCleanedText()))
         for regexp in self._re_list.items():
@@ -384,7 +381,7 @@ class ASOZDParser(DOCXDocument):
                                 self.add_result_image(extra_type, img_name)
 
                         elif self.get_config(extra_type, 'text_re'):
-                            
+
                             # check do we need to remove links or not
                             if self.get_config(extra_type, 'remove_links'):
                                 extra_par_text = para.getCleanedText()
@@ -415,7 +412,6 @@ class ASOZDParser(DOCXDocument):
 
             par_iter = par_iter + 1
 
-
     def recreate_dest_folder_sturture(self, results_dir=None):
         """Creates default or specified output directory structure"""
 
@@ -424,8 +420,8 @@ class ASOZDParser(DOCXDocument):
         else:
             out_json_dir = os.path.join(BASE_DIR, OUT_DIR)
 
-        out_images_dir = os.path.join(out_json_dir, IMAGES_OUT_DIR) 
-        
+        out_images_dir = os.path.join(out_json_dir, IMAGES_OUT_DIR)
+
         # verifying out json directory
         if not os.path.exists(out_json_dir):
             os.makedirs(out_json_dir)
@@ -434,8 +430,9 @@ class ASOZDParser(DOCXDocument):
         if not os.path.exists(out_images_dir):
             os.makedirs(out_images_dir)
 
-
     def save_all_results(self, results_dir=None, results_file_name=None):
         self.recreate_dest_folder_sturture(results_dir=results_dir)
-        self.save_results_json(results_dir=results_dir, results_file_name=results_file_name)
+        self.save_results_json(
+            results_dir=results_dir,
+            results_file_name=results_file_name)
         self.save_result_images(results_dir=results_dir)
