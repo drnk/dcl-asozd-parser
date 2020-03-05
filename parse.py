@@ -1,29 +1,62 @@
+import logging
 import argparse
 import os
 import re
 import traceback
 
 from asozd import ASOZDParser
-#from DOCX import DOCXDocument, DOCXParagraph, DOCXItem
 
+
+logger = logging.getLogger(__name__)
 
 DEBUG = False
 
 if __name__ == '__main__':
+
     # arguments definition
-    parser = argparse.ArgumentParser(description="""Convert ASOZD details docx into json.
+    parser = argparse.ArgumentParser(
+        description="""Convert ASOZD details docx into json.
 
 Example (Windows): python parser.py "in"
                    python parser.py "filename.docx"
-                   
-Example (Unix): ./parser.py "in"
-                ./parser.py "filename.docx\"""", formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('fname', metavar='fileName', type=str,
-        help='filename (*.docx) or directory for parsing. Only *.docx files will be parsed')
 
-    parser.add_argument("-d", "--destination", help="Destination directory ('out' used by default)")
-    parser.add_argument("-j", "--jsonFileName", help="Destination file name (without extension) if fileName references to file")
-    parser.add_argument("-dbg", nargs='?', dest='debug_mode', const=True, default=False, help="Debug mode")
+Example (Unix): ./parser.py "in"
+                ./parser.py "filename.docx\"""",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+
+    # file name
+    parser.add_argument(
+        'fname',
+        metavar='fileName', type=str,
+        help=('filename (*.docx) or directory for parsing. '
+              'Only *.docx files will be parsed')
+    )
+
+    # destination
+    parser.add_argument(
+        "-d",
+        "--destination",
+        help="Destination directory ('out' used by default)"
+    )
+
+    # json file name
+    parser.add_argument(
+        "-j",
+        "--jsonFileName",
+        help=("Destination file name (without extension) "
+              "if fileName references to file")
+    )
+
+    # debug mode
+    parser.add_argument(
+        "-dbg",
+        nargs='?',
+        dest='debug_mode',
+        const=True,
+        default=False,
+        help="Debug mode"
+    )
 
     args = parser.parse_args()
 
@@ -33,11 +66,13 @@ Example (Unix): ./parser.py "in"
     try:
         is_directory = os.path.isdir(args.fname)
     except FileNotFoundError:
-        raise ValueError("Couldn't determine is [%s] a folder or file. Possible " % args.fname +\
-            "the name is incorrect. Please verify.")
+        raise ValueError((
+            f"Couldn't determine is [{args.fname}]"
+            " a folder or file. Possible "
+            "the name is incorrect. Please verify."))
 
     dest_file_name = args.jsonFileName
-    
+
     if is_directory:
         print('Directory detected: %s' % args.fname)
         target_list = os.listdir(args.fname)
@@ -67,8 +102,7 @@ Example (Unix): ./parser.py "in"
             print(traceback.format_exc())
             print('='*50)
 
-
-    def is_filename_fit(file_name): 
+    def is_filename_fit(file_name):
         result = True
 
         if not file_name.endswith('.docx') or file_name.startswith('~$'):
@@ -93,13 +127,13 @@ Example (Unix): ./parser.py "in"
             for file_name in files:
                 full_file_name = os.path.join(folder, file_name)
                 if is_filename_fit(file_name):
-                    parse_file(full_file_name, args.destination, dest_file_name)
-                        
+                    parse_file(
+                        full_file_name,
+                        args.destination,
+                        dest_file_name
+                    )
+
     else:
         file_name = os.path.basename(args.fname)
         if is_filename_fit(file_name):
             parse_file(args.fname, args.destination, dest_file_name)
-            
-
-
-

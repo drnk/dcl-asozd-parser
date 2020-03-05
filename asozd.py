@@ -248,6 +248,7 @@ class ASOZDParser(DOCXDocument):
             results_dir,
             results_file_name
         )
+        logger.debug('save_results_json.filename {}'.format(filepath))
 
         with io.open(filepath, 'w', encoding='utf8') as json_file:
             json.dump(

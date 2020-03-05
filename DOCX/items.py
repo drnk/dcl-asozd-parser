@@ -7,11 +7,15 @@ Module contains classes definition for DOCX elements:
   * drawings (DOCXDrawing)
   * br (DOCXBr)
 """
+import logging
 import abc
 import re
 import os
 
 from bs4 import element
+
+
+logger = logging.getLogger(__name__)
 
 LINESEP = os.linesep
 
@@ -22,14 +26,17 @@ class DOCXItem(object):
     """Common class for docx elements"""
     __metaclass__ = abc.ABCMeta
 
-    _doc = None # reference to Document
+    _doc = None  # reference to Document
     _debug = True
 
     # exclusion list for retrieving children elements
     EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr', 'bookmarkStart']
 
     def __init__(self, item, **kwargs):
-        #dbg('DOCXItem.__init__:', type(item), isinstance(item, element.Tag))
+        logger.debug('DOCXItem.__init__: {} {}'.format(
+            type(item), isinstance(item, element.Tag)
+        ))
+
         if isinstance(item, element.Tag):
             self._item = item
             if kwargs.get('docx'):
@@ -44,7 +51,7 @@ class DOCXItem(object):
 
     @property
     def name(self):
-        """Returns name of the element"""
+        """Name of the element."""
         return self._item.name
 
     @staticmethod
@@ -78,7 +85,11 @@ class DOCXItem(object):
         res = []
         for child in self.getChildren():
 
-            docx_child = DOCXItem.factory(child, docx=self.getDoc(), debug=self.is_debug())
+            docx_child = DOCXItem.factory(
+                child,
+                docx=self.getDoc(),
+                debug=self.is_debug()
+            )
             if docx_child:
                 res = res + docx_child.getRawText()
         return res
@@ -91,11 +102,11 @@ class DOCXItem(object):
 
     @abc.abstractmethod
     def getRawText(self):
-        """Returns text representation in the list where each element represent a string"""
+        """Text representation in the list where each element represents a string"""
         return self._getRawText()
 
     def getChildren(self):
-        """Returns direct children elements"""
+        """Direct children elements."""
         return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST,
                                        recursive=False)
 
@@ -105,6 +116,7 @@ class DOCXItem(object):
     def getCleanedText(self):
         """Return text element value cleaned from the element (<el>text</el> -> text)"""
         return CLEANING_REGEXP.sub('', self.getText())
+
 
 class DOCXParagraph(DOCXItem):
     """Paragraph definition for docs document"""
@@ -140,11 +152,15 @@ class DOCXDrawing(DOCXItem):
         return None
 
     def getImageName(self):
-        """Returns image name from <w:drawing>/../<a:blip r:embed="referenceId">
-        referenceId will be replaced with target reference from relationships docx file.
+        """
+        Returns image name.
+
+        From <w:drawing>/../<a:blip r:embed="referenceId">
+        referenceId will be replaced with target reference
+        from relationships docx file.
         """
         embed_tag = self._item.find('pic:blipFill').find('a:blip')
-        #pic_tag = self._item.find('pic:cNvPr')
+        # pic_tag = self._item.find('pic:cNvPr')
         if embed_tag:
             #  <a:blip r:embed="rId6"/>
             rId = embed_tag.get('r:embed')
