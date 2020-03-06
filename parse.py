@@ -102,22 +102,26 @@ Example (Unix): ./parser.py "in"
         except KeyboardInterrupt:
             raise
         except:
-            print('='*50)
-            print("!!!PARSING ERROR OCCURED!!!")
-            print("Error occurred during parsing file: %s" % file_name)
-            print(traceback.format_exc())
-            print('='*50)
+            logging.error('='*50)
+            logging.error("!!!PARSING ERROR OCCURED!!!")
+            logging.error("Error occurred during parsing file: %s" % file_name)
+            logging.error(traceback.format_exc())
+            logging.error('='*50)
 
     def is_filename_fit(file_name):
         result = True
 
         if not file_name.endswith('.docx') or file_name.startswith('~$'):
-            logger.info('Skipping {} as non supportable file.'.format(file_name))
+            logger.info(
+                'Skipping {} as non supportable file.'.format(file_name)
+            )
             result = False
 
         # skip dead and left out
         if re.search(r"(ВЫБЫЛ(А)?|УМЕР(ЛА)?|СДАЛ)", file_name):
-            logger.info('Skipping {} as left out or dead person.'.format(file_name))
+            logger.info(
+                'Skipping {} as left out or dead person.'.format(file_name)
+            )
             result = False
 
         # skip technical files

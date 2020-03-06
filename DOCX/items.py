@@ -7,10 +7,10 @@ Module contains classes definition for DOCX elements:
   * drawings (DOCXDrawing)
   * br (DOCXBr)
 """
-import logging
 import abc
-import re
+import logging
 import os
+import re
 
 from bs4 import element
 
@@ -77,7 +77,6 @@ class DOCXItem(object):
     @abc.abstractmethod
     def _getRawText(self):
         """Returns unprocessed text from element"""
-        #if self.is_debug(): print(">>> Call <%s>.getRawText()" % self.name)
 
         res = []
         for child in self.getChildren():
@@ -94,24 +93,32 @@ class DOCXItem(object):
     @abc.abstractmethod
     def getText(self):
         """Returns text representation of the element"""
-        #print(self._getRawText())
         return ''.join(self._getRawText())
 
     @abc.abstractmethod
     def getRawText(self):
-        """Text representation in the list where each element represents a string"""
+        """
+        DOCXItem str representation.
+
+        Returns the list where each element is a string."""
         return self._getRawText()
 
     def getChildren(self):
         """Direct children elements."""
-        return self._item.findChildren(lambda tag: tag.name not in self.EXCLUDE_LIST,
-                                       recursive=False)
+        return self._item.findChildren(
+            lambda tag: tag.name not in self.EXCLUDE_LIST,
+            recursive=False
+        )
 
     def __str__(self):
         return self.getText()
 
     def getCleanedText(self):
-        """Return text element value cleaned from the element (<el>text</el> -> text)"""
+        """
+        Returns text element value cleaned from the elements.
+
+        Example: (<el>text</el> -> text)
+        """
         return CLEANING_REGEXP.sub('', self.getText())
 
 
@@ -131,7 +138,10 @@ class DOCXParagraph(DOCXItem):
                 self._id = item.attrs['w14:paraId']
 
     def getImages(self):
-        return self._item.findChildren(DOCXDrawing.full_tag_name, recursive=True)
+        return self._item.findChildren(
+            DOCXDrawing.full_tag_name,
+            recursive=True
+        )
 
     def getId(self):
         return '' if self._id is None else self._id
@@ -180,10 +190,12 @@ class DOCXHyperlink(DOCXItem):
     def _getRawText(self):
         href = None
         if self.getDoc():
-            href = self.getDoc().get_relationship_target_by_id(self.getRelationshipId())
+            href = self.getDoc().get_relationship_target_by_id(
+                self.getRelationshipId()
+            )
 
         text = DOCXRun(self._item.find(DOCXRun.full_tag_name)).getText()
-        return ['<a href="%s">%s</a>' % (href, text)]
+        return ['<a href="{}">{}</a>'.format(href, text)]
 
     def getCleanedText(self):
         return self._item.get_text()
