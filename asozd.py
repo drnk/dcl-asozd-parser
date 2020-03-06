@@ -9,7 +9,6 @@ import operator
 import os
 import re
 import shutil
-from pprint import pprint
 
 
 from DOCX.document import DOCXDocument
@@ -34,8 +33,7 @@ class ASOZDParser(DOCXDocument):
     _debug = False
 
     def _dbg(self, msg):
-        if self._debug:
-            pprint(msg)
+        raise NotImplementedError
 
     def __init__(self, file_name, *args, **kwargs):
         super(ASOZDParser, self).__init__(file_name, *args, **kwargs)
@@ -167,7 +165,7 @@ class ASOZDParser(DOCXDocument):
         """Copying images from docx zip structure to the destination folder"""
         if self._results['photo'].get('images'):
             for img_name in self._results['photo']['images']:
-                self._dbg('Trying to save image: %s' % img_name)
+                self.info('Trying to save image: {}'.format(img_name))
 
                 filename = self.gen_abs_fname_for_result_image(
                     img_name, results_dir
@@ -181,7 +179,7 @@ class ASOZDParser(DOCXDocument):
                         finally:
                             if docx_img:
                                 docx_img.close()
-                self._dbg('Image saved.')
+                logger.info('Image saved.')
 
     def gen_fname_for_result_json(
             self,
@@ -340,7 +338,9 @@ class ASOZDParser(DOCXDocument):
                 if not_re:
                     tmp_not_re = re.compile(not_re)
                     if not tmp_not_re.match(para.getCleanedText().strip()):
-                        self._dbg('Paragraph text: '+para.getCleanedText())
+                        logger.debug(
+                            'Paragraph text: {}'.format(para.getCleanedText())
+                        )
                         return regexp[1]
                     else:
                         pass
@@ -405,15 +405,21 @@ class ASOZDParser(DOCXDocument):
                 extra_types_list = self.get_config(work_type, 'also_contains')
                 if extra_types_list:
 
-                    self._dbg('Found %d extra types: %s' % \
-                        (len(extra_types_list), extra_types_list))
+                    logger.debug('Found {} extra types: {}'.format(
+                            len(extra_types_list), extra_types_list
+                        )
+                    )
                     for extra_type in extra_types_list:
                         if self.get_config(extra_type, 'is_image'):
-                            self._dbg('Try to find images within paragraph')
+                            logger.debug('Try to find images within paragraph...')
                             for img in para.getImages():
-                                drw = DOCXDrawing(img, docx=document, debug=self.is_debug())
+                                drw = DOCXDrawing(
+                                    img,
+                                    docx=document,
+                                    debug=self.is_debug()
+                                )
                                 img_name = drw.getImageName()
-                                self._dbg('Image %s found' % img_name)
+                                logger.info('Image {} found'.format(img_name))
 
                                 # adding image to result
                                 self.add_result_image(extra_type, img_name)
@@ -424,9 +430,14 @@ class ASOZDParser(DOCXDocument):
                             if self.get_config(extra_type, 'remove_links'):
                                 extra_par_text = para.getCleanedText()
 
-                            self._dbg("Found 'text_re' for %s" % extra_type)
-                            self._dbg('Searching [%s] in [%s]' %
-                                      (self.get_config(extra_type, 'text_re'), extra_par_text))
+                            logger.debug(
+                                "Found 'text_re' for {}".format(extra_type)
+                            )
+                            logger.debug('Searching [{}] in [{}]'.format(
+                                    self.get_config(extra_type, 'text_re'),
+                                    extra_par_text
+                                )
+                            )
                             match_res = re.search(self.get_config(extra_type, 'text_re'), extra_par_text)
                             if match_res:
                                 search_res = match_res.group(0).strip()
@@ -443,7 +454,7 @@ class ASOZDParser(DOCXDocument):
                     self.add_result(p_type, par_text, replace_check_re_with='')
                 elif last_recognized_type:
                     logger.info(
-                        ('Paragraph hasn''t recognized. Add data to the last '
+                        ('Paragraph hasn`t recognized. Add data to the last '
                          'recognized as [{}]'.format(last_recognized_type))
                     )
                     self.add_result(
