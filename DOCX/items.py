@@ -33,9 +33,6 @@ class DOCXItem(object):
     EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr', 'bookmarkStart']
 
     def __init__(self, item, **kwargs):
-        logger.debug('DOCXItem.__init__: {} {}'.format(
-            type(item), isinstance(item, element.Tag)
-        ))
 
         if isinstance(item, element.Tag):
             self._item = item

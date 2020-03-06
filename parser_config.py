@@ -75,7 +75,7 @@ config = {
         'lobby': {
             'order_id': 10,
             'name': 'lobby',
-            'check_re': r'Групп(а|ы) лоббистов:?\s*',
+            'check_re': r'(Групп(а|ы) лоббистов:?\s*|Групп(а|ы) интересов:?\s*)',
             'list_of_strings': True, # export as list of strings,
                                      # otherwise content data will be exported like one string
             'remove_empty_items': True,

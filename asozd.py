@@ -2,17 +2,18 @@
 Definition of ASOZDParser class.
 Provides parser logic for docx files.
 """
-import logging
 import io
-import shutil
-import os
-import operator
-import re
 import json
-
+import logging
+import operator
+import os
+import re
+import shutil
 from pprint import pprint
+
+
 from DOCX.document import DOCXDocument
-from DOCX.items import DOCXParagraph, DOCXDrawing
+from DOCX.items import DOCXDrawing, DOCXParagraph
 
 
 logger = logging.getLogger(__name__)
@@ -150,7 +151,9 @@ class ASOZDParser(DOCXDocument):
 
     def add_result_image(self, res_type, image_name):
         """Adding image data to specific result domain"""
-        logger.debug("Adding image %s for recognized %s" % (image_name, res_type))
+        logger.info(
+            "Adding image {} for recognized {}".format(image_name, res_type)
+        )
         if self._results[res_type].get('images'):
             self._results[res_type]['images'].append(image_name)
         else:
@@ -310,7 +313,6 @@ class ASOZDParser(DOCXDocument):
     #def getParagraphsRefs(self):
     #    return [p['ref'] for p in self.pStorage]
 
-
     def recognize_paragraph(self, para):
         """
         Run process of recognition of paragraph.
@@ -319,10 +321,18 @@ class ASOZDParser(DOCXDocument):
         regular expressions to determine type of the
         paragraph content.
         """
-        #dbg('Paragraph text (%s): %s' % (para._item.tag, para.getCleanedText()))
+        logger.debug(
+            'Paragraph text ({}): {}'.format(
+                para._item.tag, para.getCleanedText()
+            )
+        )
         for regexp in self._re_list.items():
             tmp_re = re.compile(regexp[0])
-            self._dbg('Trying to recognize paragraph [%s] as %s with regex %s' % (para.getId(), regexp[1], regexp[0]))
+            logger.debug(
+                'Trying to recognize paragraph [{}] as {} with regex {}'.format(
+                    para.getId(), regexp[1], regexp[0]
+                )
+            )
             #self._dbg('Paragraph text: %s' % para.getCleanedText().strip())
             if tmp_re.match(para.getCleanedText().strip()):
 
@@ -355,34 +365,43 @@ class ASOZDParser(DOCXDocument):
 
         for praw in document.get_doc_paragraphs_iter():
 
-            # dbg - start
-            #self._dbg([c.name for c in praw.findChildren(recursive=False)])
-            # dbg - stop
+            #  dbg - start
+            # self._dbg([c.name for c in praw.findChildren(recursive=False)])
+            #  dbg - stop
 
             para = DOCXParagraph(praw, docx=document)
-            #self.addParagraph(p)
-            self._dbg('----> (%02d) Paragraph '% par_iter + para.getId())
+            # self.addParagraph(p)
+            pid = para.getId()
+            logger.debug(
+                '----> ({:02d}) Paragraph {}'.format(par_iter, pid)
+            )
 
             if para.getCleanedText().strip() == '':
-                self._dbg('Paragraph %s text is empty. Skipping it.' % para.getId())
+                logger.debug(
+                    'Paragraph {} text is empty. Skipping it.'.format(pid)
+                )
                 continue
 
             p_type = self.recognize_paragraph(para)
 
             if p_type or last_recognized_type:
 
-                # forming paragraph text as joining raw data without any join chars
+                # forming paragraph text as joining raw
+                # data without any join chars
                 par_text = ''.join(para.getRawText())
 
-                # to avoid fragmented values within raw value we split text into strings
-                # it is usefull for lobby parsing, because every word in docx could be
-                # separated to own element and it is difficult to strip 'check_re' matches
-                # from the list where evary word is element
-                #raw_text = par_text.split(self.linesep)
+                # to avoid fragmented values within raw value
+                # we split text into strings it is usefull for
+                # lobby parsing, because every word in docx
+                # could be separated to own element and it is
+                # difficult to strip 'check_re' matches from
+                # the list where evary word is element
+                # raw_text = par_text.split(self.linesep)
 
                 work_type = p_type if p_type else last_recognized_type
 
-                # determine if we have to find something within recognized paragraph
+                # determine if we have to find something
+                # within recognized paragraph
                 extra_types_list = self.get_config(work_type, 'also_contains')
                 if extra_types_list:
 
@@ -416,18 +435,25 @@ class ASOZDParser(DOCXDocument):
                                     par_text = par_text.replace(search_res, '')
 
                 if p_type:
-                    self._dbg('Paragraph recognized as [%s]' % p_type)
+                    logger.info('Paragraph recognized as [{}]'.format(p_type))
                     last_recognized_type = p_type
 
                     # save result
                     #self.addResult(p_type, par_text, par_raw_text, replace_check_re_with='')
                     self.add_result(p_type, par_text, replace_check_re_with='')
                 elif last_recognized_type:
-                    self._dbg('Paragraph hasn''t recognized. Add data to the last '+\
-                        'recognized as [%s]' % last_recognized_type)
-                    self.add_result(last_recognized_type, self.linesep + par_text)
+                    logger.info(
+                        ('Paragraph hasn''t recognized. Add data to the last '
+                         'recognized as [{}]'.format(last_recognized_type))
+                    )
+                    self.add_result(
+                        last_recognized_type,
+                        self.linesep + par_text
+                    )
             else:
-                self._dbg('Warning! Paragraph iter %d was skipped.' % par_iter)
+                logger.warning(
+                    'Paragraph iter {} was skipped.'.format(par_iter)
+                )
 
             par_iter = par_iter + 1
 
