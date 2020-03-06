@@ -17,20 +17,19 @@ if __name__ == '__main__':
 
     # arguments definition
     parser = argparse.ArgumentParser(
-        description="""Convert ASOZD details docx into json.
+        description="""Convert specific structured Open Office XML files into json.
 
-Example (Windows): python parser.py "in"
-                   python parser.py "filename.docx"
-
-Example (Unix): ./parser.py "in"
-                ./parser.py "filename.docx\"""",
+./parser.py "in"
+./parser.py "filename.docx"
+""",
         formatter_class=argparse.RawTextHelpFormatter
     )
 
     # file name
     parser.add_argument(
-        'fname',
-        metavar='fileName', type=str,
+        'f',
+        metavar='file_name',
+        type=str,
         help=('filename (*.docx) or directory for parsing. '
               'Only *.docx files will be parsed')
     )
@@ -38,26 +37,21 @@ Example (Unix): ./parser.py "in"
     # destination
     parser.add_argument(
         "-d",
-        "--destination",
         help="Destination directory ('out' used by default)"
     )
 
     # json file name
     parser.add_argument(
         "-j",
-        "--jsonFileName",
         help=("Destination file name (without extension) "
               "if fileName references to file")
     )
 
     # debug mode
     parser.add_argument(
-        "-dbg",
-        nargs='?',
-        dest='debug_mode',
-        const=True,
-        default=False,
-        help="Debug mode"
+        "-v",
+        action="store_true",
+        help="Increase output verbosity"
     )
 
     args = parser.parse_args()

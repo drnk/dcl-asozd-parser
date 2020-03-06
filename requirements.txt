@@ -3,5 +3,6 @@ flake8==3.7.9
 flake8-builtins==1.4.2
 flake8-import-order==0.18.1
 lxml==4.5.0
+mypy==0.761
 pyflakes==2.1.1
 pytest==5.3.5

@@ -2,6 +2,7 @@
 .env
 .vscode
 .venv
+**/*.code-workspace
 
 # python
 **/*.pyc
