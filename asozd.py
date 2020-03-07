@@ -11,8 +11,8 @@ import re
 import shutil
 
 
-from DOCX.document import DOCXDocument
-from DOCX.items import DOCXDrawing, DOCXParagraph
+from docx.document import DOCXDocument
+from docx.items import DOCXDrawing, DOCXParagraph
 
 
 logger = logging.getLogger(__name__)
@@ -175,7 +175,7 @@ class ASOZDParser(DOCXDocument):
         """Copying images from docx zip structure to the destination folder"""
         if self._results['photo'].get('images'):
             for img_name in self._results['photo']['images']:
-                self.info('Trying to save image: {}'.format(img_name))
+                logger.info('Trying to save image: {}'.format(img_name))
 
                 filename = self.gen_abs_fname_for_result_image(
                     img_name, results_dir
@@ -183,6 +183,7 @@ class ASOZDParser(DOCXDocument):
                 if filename:
                     with open(filename, 'wb') as fimg:
                         try:
+                            docx_img = None
                             doc = self.get_doc()
                             docx_img = doc.open_docx_image(img_name)
                             shutil.copyfileobj(docx_img, fimg)
@@ -365,7 +366,9 @@ class ASOZDParser(DOCXDocument):
         return None
 
     def load_paragraphs(self):
-        """Load docx paragraphs (one by one) to instance with recognition all of them
+        """
+        Load docx paragraphs (one by one) to
+        instance with recognition all of them.
         """
         # open file
         document = self._doc
@@ -379,16 +382,11 @@ class ASOZDParser(DOCXDocument):
 
         for praw in document.get_doc_paragraphs_iter():
 
-            #  dbg - start
-            # self._dbg([c.name for c in praw.findChildren(recursive=False)])
-            #  dbg - stop
-
             para = DOCXParagraph(praw, docx=document)
             # self.addParagraph(p)
             pid = para.getId()
             logger.debug(
-                '----> ({:02d}) Paragraph {}'.format(par_iter, pid)
-            )
+                '----> ({:02d}) Paragraph {}', par_iter, pid)
 
             if para.getCleanedText().strip() == '':
                 logger.debug(

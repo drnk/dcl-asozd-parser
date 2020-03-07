@@ -6,7 +6,8 @@
 
 # python
 **/*.pyc
-__pycache__
+**/__pycache__
+**/.mypy_cache
 
 # test documents
 in/*

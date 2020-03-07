@@ -22,11 +22,25 @@ LINESEP = os.linesep
 CLEANING_REGEXP = re.compile('<[^>]+>')
 
 
-class DOCXItem(object):
-    """Common class for docx elements"""
-    __metaclass__ = abc.ABCMeta
+class DOCXItemProto(abc.ABC):
 
-    _doc = None  # reference to Document
+    @abc.abstractmethod
+    def _getRawText(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def getText(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def getRawText(self):
+        raise NotImplementedError
+
+
+class DOCXItem(DOCXItemProto):
+    """Common class for docx elements."""
+
+    _doc: 'DOCXDocument' = None  # reference to Document
     _debug = True
 
     # exclusion list for retrieving children elements
@@ -44,6 +58,12 @@ class DOCXItem(object):
 
     def getDoc(self):
         """Returns reference to DOCXDocument instance"""
+        # return self._doc
+        raise NotImplementedError
+
+    @property
+    def doc(self):
+        """Reference to DOCXDocument instance."""
         return self._doc
 
     @property
@@ -74,8 +94,7 @@ class DOCXItem(object):
         """Returns True is debug mode is on, otherwise returns False"""
         return self._debug is True
 
-    @abc.abstractmethod
-    def _getRawText(self):
+    def _getRawText(self) -> str:
         """Returns unprocessed text from element"""
 
         res = []
@@ -83,19 +102,17 @@ class DOCXItem(object):
 
             docx_child = DOCXItem.factory(
                 child,
-                docx=self.getDoc(),
+                docx=self.doc,
                 debug=self.is_debug()
             )
             if docx_child:
                 res = res + docx_child.getRawText()
         return res
 
-    @abc.abstractmethod
     def getText(self):
         """Returns text representation of the element"""
         return ''.join(self._getRawText())
 
-    @abc.abstractmethod
     def getRawText(self):
         """
         DOCXItem str representation.
@@ -125,8 +142,8 @@ class DOCXItem(object):
 class DOCXParagraph(DOCXItem):
     """Paragraph definition for docs document"""
 
-    full_tag_name = 'w:p'
-    tag_name = 'p'
+    FULL_TAG_NAME = 'w:p'
+    TAG_NAME = 'p'
 
     _id = None
 
@@ -139,7 +156,7 @@ class DOCXParagraph(DOCXItem):
 
     def getImages(self):
         return self._item.findChildren(
-            DOCXDrawing.full_tag_name,
+            DOCXDrawing.FULL_TAG_NAME,
             recursive=True
         )
 
@@ -152,8 +169,8 @@ class DOCXParagraph(DOCXItem):
 
 class DOCXDrawing(DOCXItem):
     """Representation of w:drawing docx element"""
-    full_tag_name = 'w:drawing'
-    tag_name = 'drawing'
+    FULL_TAG_NAME = 'w:drawing'
+    TAG_NAME = 'drawing'
 
     def getText(self):
         return None
@@ -171,30 +188,30 @@ class DOCXDrawing(DOCXItem):
         if embed_tag:
             #  <a:blip r:embed="rId6"/>
             rId = embed_tag.get('r:embed')
-            if rId and self.getDoc():
-                return self.getDoc().get_relationship_target_by_id(rId)
+            if rId and self.doc:
+                return self.doc.get_relationship_target_by_id(rId)
 
         return None
 
 
 class DOCXHyperlink(DOCXItem):
-    """Representation of w:t docx element"""
+    """Representation of w:t docx element."""
 
-    full_tag_name = 'w:hyperlink'
-    tag_name = 'hyperlink'
+    FULL_TAG_NAME = 'w:hyperlink'
+    TAG_NAME = 'hyperlink'
 
     def getRelationshipId(self):
-        """Returns relationship identifier"""
+        """Returns relationship identifier."""
         return self._item.get('r:id')
 
     def _getRawText(self):
         href = None
-        if self.getDoc():
-            href = self.getDoc().get_relationship_target_by_id(
+        if self.doc:
+            href = self.doc.get_relationship_target_by_id(
                 self.getRelationshipId()
             )
 
-        text = DOCXRun(self._item.find(DOCXRun.full_tag_name)).getText()
+        text = DOCXRun(self._item.find(DOCXRun.FULL_TAG_NAME)).getText()
         return ['<a href="{}">{}</a>'.format(href, text)]
 
     def getCleanedText(self):
@@ -203,10 +220,10 @@ class DOCXHyperlink(DOCXItem):
 
 class DOCXRun(DOCXItem):
     """
-    Representation of <w:r> docx element
+    Representation of <w:r> docx element.
 
     Runs most commonly contain text elements <w:t>
-    (which contain the actual literal text of a pararaph),
+    (which contain the actual literal text of a paragraph),
     but they may also contain such special content as symbols,
     tabs, hyphens, carriage returns, drawings, breaks,
     and footnote references.
@@ -214,15 +231,15 @@ class DOCXRun(DOCXItem):
     Current versions supports only <w:t> and <w:br> elements
     """
 
-    full_tag_name = 'w:r'
-    tag_name = 'r'
+    FULL_TAG_NAME = 'w:r'
+    TAG_NAME = 'r'
 
     def _getRawText(self):
         res = []
 
-        tag_target_list = [DOCXText.full_tag_name, DOCXBr.full_tag_name]
+        tag_target_list = [DOCXText.FULL_TAG_NAME, DOCXBr.FULL_TAG_NAME]
         for item in self._item.findChildren(tag_target_list, recursive=False):
-            el = DOCXItem.factory(item, docx=self.getDoc())
+            el = DOCXItem.factory(item, docx=self.doc)
             if el:
                 txt = el.getRawText()
                 if txt:
@@ -236,8 +253,8 @@ class DOCXRun(DOCXItem):
 class DOCXText(DOCXItem):
     """Representation of <w:t> docx element"""
 
-    full_tag_name = 'w:t'
-    tag_name = 't'
+    FULL_TAG_NAME = 'w:t'
+    TAG_NAME = 't'
 
     def _getRawText(self):
         return [self._item.text]
@@ -246,8 +263,8 @@ class DOCXText(DOCXItem):
 class DOCXBr(DOCXItem):
     """Representation of <w:br> docx element"""
 
-    full_tag_name = 'w:br'
-    tag_name = 'br'
+    FULL_TAG_NAME = 'w:br'
+    TAG_NAME = 'br'
 
     def _getRawText(self):
         return [LINESEP]

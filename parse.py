@@ -15,7 +15,9 @@ logging.getLogger().setLevel(logging.INFO)  # default level is INFO
 DEBUG = False
 
 
-def parse_file(file_name, dest_dir, dest_file_name):
+def parse_file(file_name: str,
+               dest_dir: str = None,
+               dest_file_name: str = None) -> None:
     logger.info('Looking {} file for valuable content.'.format(file_name))
 
     try:
@@ -38,7 +40,7 @@ def parse_file(file_name, dest_dir, dest_file_name):
         logging.error('='*50)
 
 
-def is_filename_fit(file_name):
+def is_filename_fit(file_name: str) -> bool:
     result = True
 
     if not file_name.endswith('.docx') or file_name.startswith('~$'):
@@ -62,7 +64,10 @@ def is_filename_fit(file_name):
     return result
 
 
-def parser(file_name, destination=None, json_file=None, verbose=False):
+def parser(file_name: str,
+           destination: str = None,
+           json_file: str = None,
+           verbose: bool = False) -> None:
     """
     Convert specific structured Open Office XML files into json.
 
