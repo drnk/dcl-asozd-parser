@@ -40,6 +40,19 @@ def parse_file(file_name: str,
         logging.error('='*50)
 
 
+def filter_filenames(dirpath, predicate):
+    """Usage:
+
+           >>> for filename in filter_filenames('/', re.compile(r'/home.*\.bak').match):
+           ....    # do something
+    """
+    for dir_, dirnames, filenames in os.walk(dirpath):
+        for filename in filenames:
+            abspath = os.path.join(dir_, filename)
+            if predicate(abspath):
+                yield abspath
+
+
 def is_filename_fit(file_name: str) -> bool:
     result = True
 
@@ -64,58 +77,61 @@ def is_filename_fit(file_name: str) -> bool:
     return result
 
 
-def parser(file_name: str,
+def parser(source: str,
+           *,
+           source_mask: str = None,
            destination: str = None,
-           json_file: str = None,
            verbose: bool = False) -> None:
     """
     Convert specific structured Open Office XML files into json.
 
-    :param file_name: filename (*.docx) or directory for parsing.
-                      Only *.docx files will be parsed
+    :param source: filename or directory for parsing.
+                   Only *.docx files will be parsed in case of directory.
+    :param source_mask: regexp mask for iterating over files if `source`
+        is a directory
     :param destination: Destination directory ('out' used by default)
     :param json_file: Destination file name (without extension).
                       Works only if file_name references to file
     :param verbose: Increase output verbosity
     """
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
-    try:
-        is_directory = os.path.isdir(file_name)
-    except FileNotFoundError:
+    abs_source = os.path.abspath(source)
+    logger.info('Passed %s as a source file/dir name', abs_source)
+
+    if not os.path.exists(abs_source):
         raise ValueError((
-            f"Couldn't determine is [{file_name}]"
-            " a folder or file. Possible "
-            "the name is incorrect. Please verify."))
+            f"Couldn't find or access a '{source}'"
+            " folder or file. Please verify."))
 
-    dest_file_name = json_file
+    is_dir = os.path.isdir(abs_source)
 
-    if is_directory:
-        logger.info('Directory detected: {}'.format(file_name))
-        # target_list = os.listdir(file_name)
-        target_dir = file_name
+    if is_dir:
+        # -------------------------------------------------
+        # DIRECTORY processing
+        # -------------------------------------------------
+        logger.info('  Directory detected: %s', abs_source)
+        logger.info('  Source mask: %s', source_mask)
 
-        dest_file_name = None
-    else:
-        logger.info('File detected: {}'.format(file_name))
-        # target_list = [file_name]
+        source_dir = os.path.split(abs_source)[0]
+        if source_mask:
+            predicate = re.compile(source_mask).match
+        else:
+            predicate = is_filename_fit
 
-    if is_directory:
-        # traverse root directory, and list directories
-        # as dirs and files as files
-        for folder, dirs, files in os.walk(target_dir):
-            for file_name in files:
-                full_file_name = os.path.join(folder, file_name)
-                if is_filename_fit(file_name):
-                    parse_file(
-                        full_file_name,
-                        destination,
-                        dest_file_name
-                    )
+        for docx_item in filter_filenames(source_dir, predicate):
+            parse_file(docx_item, destination)
 
     else:
-        base_file_name = os.path.basename(file_name)
-        if is_filename_fit(base_file_name):
-            parse_file(file_name, destination, json_file)
+        # -------------------------------------------------
+        # FILE processing
+        # -------------------------------------------------
+        logger.info('File detected: %s', abs_source)
+
+        file_name = os.path.basename(abs_source)
+        if is_filename_fit(file_name):
+            parse_file(abs_source, destination)
 
 
 if __name__ == '__main__':

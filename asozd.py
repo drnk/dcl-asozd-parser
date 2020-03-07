@@ -385,8 +385,7 @@ class ASOZDParser(DOCXDocument):
             para = DOCXParagraph(praw, docx=document)
             # self.addParagraph(p)
             pid = para.getId()
-            logger.debug(
-                '----> ({:02d}) Paragraph {}', par_iter, pid)
+            logger.debug('----> (%02d) Paragraph %s', par_iter, pid)
 
             if para.getCleanedText().strip() == '':
                 logger.debug(
@@ -433,7 +432,7 @@ class ASOZDParser(DOCXDocument):
                                     debug=self.is_debug()
                                 )
                                 img_name = drw.getImageName()
-                                logger.info('Image {} found'.format(img_name))
+                                logger.info('Image %s found', img_name)
 
                                 # adding image to result
                                 self.add_result_image(extra_type, img_name)
@@ -444,13 +443,11 @@ class ASOZDParser(DOCXDocument):
                             if self.get_config(extra_type, 'remove_links'):
                                 extra_par_text = para.getCleanedText()
 
+                            logger.debug("Found 'text_re' for %s", extra_type)
                             logger.debug(
-                                "Found 'text_re' for {}".format(extra_type)
-                            )
-                            logger.debug('Searching [{}] in [{}]'.format(
-                                    self.get_config(extra_type, 'text_re'),
-                                    extra_par_text
-                                )
+                                'Searching [%s] in [%s]',
+                                self.get_config(extra_type, 'text_re'),
+                                extra_par_text
                             )
                             match_res = re.search(
                                 self.get_config(extra_type, 'text_re'),
@@ -467,23 +464,21 @@ class ASOZDParser(DOCXDocument):
                                     par_text = par_text.replace(search_res, '')
 
                 if p_type:
-                    logger.info('Paragraph recognized as [{}]'.format(p_type))
+                    logger.info('Paragraph recognized as [%s]', p_type)
                     last_recognized_type = p_type
 
                     self.add_result(p_type, par_text, replace_check_re_with='')
                 elif last_recognized_type:
                     logger.info(
-                        ('Paragraph hasn`t recognized. Add data to the last '
-                         'recognized as [{}]'.format(last_recognized_type))
+                        'Paragraph hasn`t recognized. Add data to the last '
+                        'recognized as [%s]', last_recognized_type
                     )
                     self.add_result(
                         last_recognized_type,
                         self.linesep + par_text
                     )
             else:
-                logger.warning(
-                    'Paragraph iter {} was skipped.'.format(par_iter)
-                )
+                logger.warning('Paragraph iter %s was skipped.', par_iter)
 
             par_iter = par_iter + 1
 
