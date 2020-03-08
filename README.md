@@ -47,4 +47,8 @@ pytest
 
 ## Running
 
+To parse all files end ups with `итоговая карточка`, run:
 
+```bash
+python parse.py "in" --source-mask=".*,\s*итоговая карточка.docx"
+```

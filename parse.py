@@ -112,15 +112,26 @@ def parser(source: str,
         # DIRECTORY processing
         # -------------------------------------------------
         logger.info('  Directory detected: %s', abs_source)
-        logger.info('  Source mask: %s', source_mask)
 
-        source_dir = os.path.split(abs_source)[0]
+
+        # No extra work needed. abs_source stores
+        # the full path to source data
+        source_dir = abs_source
+
         if source_mask:
-            predicate = re.compile(source_mask).match
+            logger.info('  Source mask: %s', source_mask)
+            check_re = re.compile(source_mask)
+
+            #'\\t'.encode().decode('unicode_escape')
+            logger.debug('[%s] and pattern: [%s]', str(check_re), check_re.pattern)
+            predicate = check_re.match
         else:
+            logger.info('Parameter `source_mask` hasn''t passed ')
             predicate = is_filename_fit
 
+        logger.debug('source_dir=[%s]; predicate=[%s]', source_dir, str(predicate))
         for docx_item in filter_filenames(source_dir, predicate):
+            logger.info('  >>>...>>>...>>>... Start processing file: %s', docx_item)
             parse_file(docx_item, destination)
 
     else:
