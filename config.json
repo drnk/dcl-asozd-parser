@@ -1,0 +1,83 @@
+{
+    "sections": {
+        "fio": {
+            "order_id": 1,
+            "check_re": "^[А-Я][а-яё\\-]+\\s+[А-Я][а-яё\\-]+\\s+[А-Я][а-яё\\-]+$",
+            "not_re": "^(Депутат Государственной Думы|Законотворчество|Депутат|Представитель) ",
+            "also_contains": [
+                "photo"
+            ],
+            "next_items": [
+                "position"
+            ],
+            "name": "fio",
+            "do_not_replace_check_re": true
+        },
+        "photo": {
+            "order_id": 2,
+            "name": "photo",
+            "is_image": true
+        },
+        "position": {
+            "order_id": 3,
+            "check_re": "(^Депутат|^Представитель)",
+            "also_contains": [],
+            "next_items": [
+                "fraction"
+            ],
+            "name": "position",
+            "do_not_replace_check_re": true
+        },
+        "fraction": {
+            "order_id": 4,
+            "check_re": "^Фракция",
+            "also_contains": [],
+            "next_items": [
+                "bio"
+            ],
+            "name": "fraction",
+            "do_not_replace_check_re": true
+        },
+        "bio": {
+            "order_id": 5,
+            "check_re": "^Биография:?\\s*",
+            "also_contains": [],
+            "next_items": [
+                "relations"
+            ],
+            "name": "bio"
+        },
+        "relations": {
+            "order_id": 6,
+            "name": "relations",
+            "check_re": "^Аффиляция, связи:?\\s*",
+            "also_contains": [
+                "family"
+            ]
+        },
+        "submitted": {
+            "order_id": 7,
+            "name": "submitted",
+            "check_re": "^Внесенные законопроекты:?\\s*"
+        },
+        "family": {
+            "order_id": 8,
+            "name": "family",
+            "text_re": "(<a[^>]+>)?([А-Яа-яё\\s]+)?(Женат|женат|замужем|Замужем).*?(?<!г)(\\.|$)",
+            "leave_also_contains_data": true,
+            "remove_links": true
+        },
+        "conclusion": {
+            "order_id": 9,
+            "name": "conclusion",
+            "check_re": "Выводы:?\\s*"
+        },
+        "lobby": {
+            "order_id": 10,
+            "name": "lobby",
+            "check_re": "(Групп(а|ы) лоббистов:?\\s*|Групп(а|ы) интересов:?\\s*)",
+            "list_of_strings": true,
+            "remove_empty_items": true
+        }
+    }
+}

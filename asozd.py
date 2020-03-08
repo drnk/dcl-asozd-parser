@@ -9,7 +9,7 @@ import operator
 import os
 import re
 import shutil
-
+from typing import Dict
 
 from docx.document import DOCXDocument
 from docx.items import DOCXDrawing, DOCXParagraph
@@ -17,29 +17,72 @@ from docx.items import DOCXDrawing, DOCXParagraph
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE_NAME = r'parser_config.json'
+# CONFIG_FILE_NAME = r'parser_config.json'
+CONFIG_FILE_NAME = r'config.json'
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 IN_DIR = r'in'
 OUT_DIR = r'out'
 IMAGES_OUT_DIR = r'images'
 
-DEBUG = True
+
+class ASOZDConfig(object):
+
+    CRE = re.compile(r'.*_re$')
+
+    def __init__(self, *args, **kwargs):
+        # for somehow the instance will have the conif at the moment
+        data = self.__getattribute__('_data')
+        if data:
+            self.data = data
+
+        if self.data:
+            self._init_re()
+
+    @property
+    def data(self):
+        return self._data
+
+    def _init_re(self):
+        # two level hierarchy configs are only supported:
+        for tl in self._data.keys():
+            if isinstance(self._data[tl], Dict):
+                for sl in [self._data[tl][k]
+                           for k in self._data[tl].keys() if self.CRE.match(k)]:
+                    logger.debug(
+                        'Compiling re for the path: /%s/%s...', tl, sl
+                    )
+                    self._data[tl][sl] = re.compile(self._data[tl][sl])
+
+
+class ASOZDConfigOld(ASOZDConfig):
+
+    def __init__(self, *args, **kwargs):
+        from parser_config import config
+        self._data = config
+
+        super(ASOZDConfigNew, self).__init__(*args, **kwargs)
+
+
+class ASOZDConfigNew(ASOZDConfig):
+
+    def __init__(self, config_file=None, *args, **kwargs):
+        if not config_file:
+            logger.warning('Config file didn\'t received. Using '
+                           'default config: [%s]', CONFIG_FILE_NAME)
+            config_file = os.path.abspath(CONFIG_FILE_NAME)
+
+        with open(config_file, 'r', encoding='utf-8') as fp:
+            self._data = json.load(fp)
+
+        super(ASOZDConfigNew, self).__init__(*args, **kwargs)
 
 
 class ASOZDParser(DOCXDocument):
     """Class for retreiving data from formed docx documents"""
 
-    _debug = False
-
-    def _dbg(self, msg):
-        raise NotImplementedError
-
     def __init__(self, file_name, *args, **kwargs):
         super(ASOZDParser, self).__init__(file_name, *args, **kwargs)
-
-        # if kwargs.get('debug'):
-        #    self._debug = (kwargs.get('debug') == True)
 
         self._line_separator = os.linesep
         if kwargs.get('linesep'):
@@ -49,8 +92,7 @@ class ASOZDParser(DOCXDocument):
         self.file_name = file_name
 
         # configuration
-        from parser_config import config
-        self.config = config
+        self.config = ASOZDConfigNew().data
 
         # list for storing paragraph data
         # self.pStorage = []
@@ -58,13 +100,6 @@ class ASOZDParser(DOCXDocument):
         self._init_config()
 
         self._doc = DOCXDocument(self.file_name)
-
-    def is_debug(self):
-        """
-        Returns True is debug mode is switched on.
-        Otherwise returns false.
-        """
-        return self._debug is True
 
     @property
     def linesep(self):
@@ -77,35 +112,33 @@ class ASOZDParser(DOCXDocument):
 
     def _init_config(self):
         dct = {}
-        for item in self.config['types'].items():
+        for item in self.config['sections'].items():
             if item[1].get('check_re'):
                 dct[item[1]['check_re']] = item[0]
         self._re_list = dct
 
         dct = {}
-        for item in self.config['types'].items():
+        for item in self.config['sections'].items():
             if item[1].get('check_re'):
                 dct[item[1]['order_id']] = item[0]
         zero_get = operator.itemgetter(0)
         self._config_ordered = \
-            [self.config['types'][x[1]]
+            [self.config['sections'][x[1]]
              for x in sorted(dct.items(), key=zero_get)]
-        # self._dbg('Ordered config created:')
-        # pprint(self._config_ordered)
 
         # dct = {}
-        # for item in self.config['types'].items():
+        # for item in self.config['sections'].items():
         #     dct[item[0]] = {
         #         'text': None,
         #         'raw_text': []
         #     }
         # self._results = dct
         self._results = {item[0]: {'text': None, 'raw_text': []}
-                         for item in self.config['types'].items()}
+                         for item in self.config['sections'].items()}
 
     def get_config(self, res_type, key):
         """Returns config 'key' value for specified 'type'"""
-        return self.config['types'][res_type].get(key)
+        return self.config['sections'][res_type].get(key)
 
     def add_result(self,
                    res_type,
@@ -254,9 +287,9 @@ class ASOZDParser(DOCXDocument):
         has a setting "'is_image': True" for the domain.
         """
         res = {}
-        for item in self.config['types'].items():
-            if self.config['types'][item[0]].get('list_of_strings') is True:
-                remove_empty_items = self.config['types'][item[0]]\
+        for item in self.config['sections'].items():
+            if self.config['sections'][item[0]].get('list_of_strings') is True:
+                remove_empty_items = self.config['sections'][item[0]]\
                     .get('remove_empty_items')
 
                 if remove_empty_items is True:
@@ -269,7 +302,7 @@ class ASOZDParser(DOCXDocument):
                         y for y in self._results[item[0]]['raw_text']
                     ]
 
-            elif self.config['types'][item[0]].get('is_image') is True:
+            elif self.config['sections'][item[0]].get('is_image') is True:
                 if self._results[item[0]].get('images'):
                     res[item[0]] = [
                         self.gen_fname_for_result_image(img_name)
@@ -335,9 +368,7 @@ class ASOZDParser(DOCXDocument):
         paragraph content.
         """
         logger.debug(
-            'Paragraph text ({}): {}'.format(
-                para._item.tag, para.getCleanedText()
-            )
+            'Paragraph text (%s): %s', para._item.tag, para.getCleanedText()
         )
         for regexp in self._re_list.items():
             tmp_re = re.compile(regexp[0])
@@ -347,15 +378,14 @@ class ASOZDParser(DOCXDocument):
                     para.getId(), regexp[1], regexp[0]
                 )
             )
-            # self._dbg('Paragraph text: %s' % para.getCleanedText().strip())
             if tmp_re.match(para.getCleanedText().strip()):
 
-                not_re = self.config['types'][regexp[1]].get('not_re')
+                not_re = self.config['sections'][regexp[1]].get('not_re')
                 if not_re:
                     tmp_not_re = re.compile(not_re)
                     if not tmp_not_re.match(para.getCleanedText().strip()):
                         logger.debug(
-                            'Paragraph text: {}'.format(para.getCleanedText())
+                            'Paragraph text: %s', para.getCleanedText()
                         )
                         return regexp[1]
                     else:
@@ -428,8 +458,7 @@ class ASOZDParser(DOCXDocument):
                             for img in para.getImages():
                                 drw = DOCXDrawing(
                                     img,
-                                    docx=document,
-                                    debug=self.is_debug()
+                                    docx=document
                                 )
                                 img_name = drw.getImageName()
                                 logger.info('Image %s found', img_name)

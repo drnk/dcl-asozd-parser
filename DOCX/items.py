@@ -11,6 +11,7 @@ import abc
 import logging
 import os
 import re
+from typing import List
 
 from bs4 import element
 
@@ -41,7 +42,6 @@ class DOCXItem(DOCXItemProto):
     """Common class for docx elements."""
 
     _doc: 'DOCXDocument' = None  # reference to Document
-    _debug = True
 
     # exclusion list for retrieving children elements
     EXCLUDE_LIST = ['pPr', 'rPr', 'proofErr', 'bookmarkStart']
@@ -52,9 +52,8 @@ class DOCXItem(DOCXItemProto):
             self._item = item
             if kwargs.get('docx'):
                 self._doc = kwargs['docx']
-
-        if kwargs.get('debug'):
-            self._debug = kwargs.get('debug') is True
+        else:
+            raise ValueError('Unexpected {}'.format(type(item)))
 
     def getDoc(self):
         """Returns reference to DOCXDocument instance"""
@@ -90,20 +89,14 @@ class DOCXItem(DOCXItemProto):
 
         return None
 
-    def is_debug(self):
-        """Returns True is debug mode is on, otherwise returns False"""
-        return self._debug is True
-
-    def _getRawText(self) -> str:
+    def _getRawText(self) -> List[str]:
         """Returns unprocessed text from element"""
 
-        res = []
+        res: str = []
         for child in self.getChildren():
-
             docx_child = DOCXItem.factory(
                 child,
-                docx=self.doc,
-                debug=self.is_debug()
+                docx=self.doc
             )
             if docx_child:
                 res = res + docx_child.getRawText()

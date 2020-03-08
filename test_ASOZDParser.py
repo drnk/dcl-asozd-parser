@@ -1,7 +1,8 @@
+import json
 import logging
 import os
 import unittest
-import json
+
 
 from asozd import ASOZDParser
 
