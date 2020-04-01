@@ -307,25 +307,6 @@ class ASOZDParser(DOCXDocument):
         """Return config as json"""
         return json.dumps(self.config, indent=4, sort_keys=True)
 
-    # def add_paragraph(self, para):
-    #    self.pStorage.append({
-    #        'id': para.getId(),
-    #        'text': para.getText(),
-    #        'ref': para
-    #    })
-
-    # def get_paragraphs_text(self, cleaned=True):
-    #    if cleaned:
-    #        return [p['ref'].getCleanedText() for p in self.pStorage]
-    #    else:
-    #        return [p['ref'].getText() for p in self.pStorage]
-
-    # def getParagraphsId(self):
-    #    return [p['id'] for p in self.pStorage]
-#
-    # def getParagraphsRefs(self):
-    #    return [p['ref'] for p in self.pStorage]
-
     def recognize_paragraph(self, para):
         """
         Run process of recognition of paragraph.

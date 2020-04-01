@@ -3,8 +3,8 @@ config = {
         'fio': {
             'order_id': 1,
             'check_re': r'^[А-Я][а-яё\-]+\s+[А-Я][а-яё\-]+\s+[А-Я][а-яё\-]+$', # regexp for recognizing paragraph
-            'not_re': r'^(Депутат Государственной Думы|Законотворчество|Депутат|Представитель) ',             # extra regexp to not to match to
-                                                                    # avoid incorrect recognitions 
+            'not_re': r'^(Депутат Государственной Думы|Законотворчество|Депутат|Представитель) ',    # extra regexp to not to match to
+                                                                                                     # avoid incorrect recognitions 
             'also_contains': ['photo'], # list of extra content types which could
                                         # be found within current paragraph
             'next_items': ['position'], # actually not used
